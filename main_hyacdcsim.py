@@ -48,8 +48,8 @@ from _PyModules import module_acdc
 # file name and paths
 str_lffile = r"kundur32_noAC.sav" # initial AC load flow"
 str_dyrfile = r"kundur.dyr" # initial AC load flow"
-str_pathlffile = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Input\KundurDC" # Path
-str_path4dynamics = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC" # Path
+str_pathlffile = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC" # Path
+str_path4dynamics = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC" # Path
 
 sys.path.append(str_pathlffile)
 import define_grids_mtdc # MTDC grid definition (.py) - USER DEFINED

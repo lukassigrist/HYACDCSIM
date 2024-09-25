@@ -2,7 +2,7 @@
  TWO AREA MULTI-MACHINE TEST SYSTEM
 
 
-The Saved Case in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Input\KundurDC\kundur32_noAC.sav was saved on WED, SEP 04 2024   8:29
+The Saved Case in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC.sav was saved on WED, SEP 04 2024   8:29
 
 Plant at bus 7 [BUS7        220.00] added. Data items with non-default values:
 X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
@@ -254,4 +254,4 @@ SWING BUS SUMMARY:
 
 Output completed
 
-Case saved in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Input\KundurDC\kundur32_noAC_MTDCg.sav on SUN, SEP 08 2024  22:59
+Case saved in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC_MTDCg.sav on WED, SEP 25 2024   7:43
