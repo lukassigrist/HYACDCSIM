@@ -1,7 +1,7 @@
 @echo off
 
-set ccfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\PSSE-TUTORIAL\Dynamic\UserModel\TestSystem\conec.flx"
-set ctfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\PSSE-TUTORIAL\Dynamic\UserModel\TestSystem\conet.flx"
+set ccfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\TestSystem\conec.flx"
+set ctfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\TestSystem\conet.flx"
 
 rem -------------------------------------------------------------------------------
 

@@ -20,7 +20,7 @@ import numpy as np
 str_lffile = r"kundur32_AC.sav" # initial AC load flow"
 str_dyrfile = r"kundur.dyr" # initial AC load flow"
 str_dllfile = r"USRSOU.dll"
-str_pathfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\PSSE-TUTORIAL\Dynamic\UserModel\TestSystem" # Path
+str_pathfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\TestSystem" # Path
 
 # Solver parameters
 TSTEP = 0.005
