@@ -17,8 +17,8 @@ import numpy as np
 # User-defined input
 # ------------------
 # file name and paths
-str_lffile = r"kundur32_AC.sav" # initial AC load flow"
-str_dyrfile = r"kundur.dyr" # initial AC load flow"
+str_lffile = r"kundur32_noAC_MTDCg.sav" # initial AC load flow"
+str_dyrfile = r"kundur_MTDCg.dyr" # initial AC load flow"
 str_dllfile = r"USRSOU.dll"
 str_pathfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\TestSystem" # Path
 
@@ -39,7 +39,7 @@ str_pathdllfile = os.path.join(str_pathfiles,str_dllfile)
 str_pathoutfile = os.path.join(str_pathfiles,r"output.out")
 str_pathconecfile = os.path.join(str_pathfiles,r"conec")
 str_pathconetfile = os.path.join(str_pathfiles,r"conet")
-str_pathcompilefile = os.path.join(str_pathfiles,r"comppile")
+str_pathcompilefile = os.path.join(str_pathfiles,r"compile")
 
 # ----------
 # Simulation

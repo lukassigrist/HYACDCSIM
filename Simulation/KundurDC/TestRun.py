@@ -10,7 +10,7 @@ import numpy as np
 
 psspy.psseinit(2000)
 
-psspy.case(r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Input\KundurDC\kundur32_noAC_MTDCg.sav""")
+psspy.case(r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC_MTDCg.sav""")
 psspy.fnsl([0,0,0,1,0,0,99,0])
 psspy.cong(0)
 psspy.conl(0,1,1,[0,0],[ 100.0,0.0,0.0, 100.0])
@@ -19,13 +19,13 @@ psspy.conl(0,1,3,[0,0],[ 100.0,0.0,0.0, 100.0])
 psspy.ordr(0)
 psspy.fact()
 psspy.tysl(0)
-psspy.dyre_new([1,1,1,1],r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Input\KundurDC\kundur_MTDCg.dyr""",
-r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC\conec""",
-r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC\conet""",
-r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC\compile""")
+psspy.dyre_new([1,1,1,1],r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur_MTDCg.dyr""",
+r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\conec""",
+r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\conet""",
+r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\compile""")
 psspy.set_netfrq(1)
 psspy.dynamics_solution_param_2([_i,_i,_i,_i,_i,_i,_i,_i],[_f,_f, 0.001,_f,_f,_f,_f,_f])
-psspy.change_channel_out_file(r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC\output""")
+psspy.change_channel_out_file(r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\output""")
 psspy.chsb(0,1,[-1,-1,-1,1,1,0])
 psspy.chsb(0,1,[-1,-1,-1,1,2,0])
 psspy.chsb(0,1,[-1,-1,-1,1,3,0])
@@ -56,8 +56,8 @@ psspy.var_channel([-1, I_VAR_SVSCON_9+25], r"PDC2_DC1")
 # psspy.var_channel([-1, 126], r"ADDPREF_DC1_7")
 # psspy.var_channel([-1, 106], r"MEANDELTA")
 
-psspy.addmodellibrary(r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC\MTDC.dll""")
-psspy.strt_2([0,1],r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC\output.out""")
+psspy.addmodellibrary(r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\MTDC.dll""")
+psspy.strt_2([0,1],r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\output.out""")
 psspy.run(0, 1,0,0,0)
 psspy.change_plmod_var(9, r"14", r"SVSCON", 1, 3.0)
 
@@ -73,7 +73,7 @@ v_idxpdcmtdc1 = range(44,46)
 fontP = FontProperties()
 fontP.set_size('small')
 
-chnfobj = dyntools.CHNF(r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Simulation\KundurDC\output.out")
+chnfobj = dyntools.CHNF(r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\output.out")
 short_title, chanid, chandata = chnfobj.get_data()
 v_t = chandata['time']
 
