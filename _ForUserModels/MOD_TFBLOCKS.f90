@@ -200,7 +200,10 @@ CONTAINS
 			CASE (2)
 				
 				! dxdt = e*KI
-				CALL SUB_INTEGRATORWINDUP(y,x,dxdt,e,2,1/KI,YMAX,YMIN)
+				IF (KI.NE.0.0) THEN
+					CALL SUB_INTEGRATORWINDUP(y,x,dxdt,e,2,1/KI,YMAX,YMIN)
+				END IF
+				
 			
 			CASE (3)
 			

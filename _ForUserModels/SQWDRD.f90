@@ -209,7 +209,7 @@ SUBROUTINE SQWDRD(I_MACH,I_SLOT)
 
 	! VARs
 	VAR(I_VAR) = qs_ini 
-	VAR(I_VAR+1) = deltaw_ref
+	VAR(I_VAR+1) = deltaw_ref ! From WDELAY (else 0.0)
 	VAR(I_VAR+2) = deltaw_bus
 	VAR(I_VAR+3) = qs_ref
 	VAR(I_VAR+4) = addqs_ref 

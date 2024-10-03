@@ -272,7 +272,7 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 
 	! VARs
 	VAR(I_VAR) = ps_ini				! Reference active power, coincides with load flow values
-	VAR(I_VAR+1) = deltaw_ref
+	VAR(I_VAR+1) = deltaw_ref		! From WDELAY (else 0.0)
 	VAR(I_VAR+2) = deltau_ini
 	VAR(I_VAR+3) = ps_ref
 	VAR(I_VAR+4) = addps_ref 
