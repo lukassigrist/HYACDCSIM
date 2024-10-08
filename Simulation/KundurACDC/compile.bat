@@ -1,7 +1,7 @@
 @echo off
 
-set ccfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\KundurAC-DC\conec.flx"
-set ctfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\KundurAC-DC\conet.flx"
+set ccfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurACDC\conec.flx"
+set ctfile="C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurACDC\conet.flx"
 
 rem -------------------------------------------------------------------------------
 

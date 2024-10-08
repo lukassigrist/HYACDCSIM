@@ -12,157 +12,126 @@
 ! 3. Excitation stabilizer models, 4. Excitation system models, 5. Turbine-governor models. Turbine governor, stabilizer
 ! and excitation limiter models have no initialization duties other than STATEs and VARs.
 ! 
-! The VSC converter model, SVSCON, is implemented as a coordinated-call, current injecting generator model (IC = 1 
-! and IT = 1). Coordinated-call implementation is needed due to the representation of the generatorby a Norton 
-! equivalent.   
+! The VSC converter model, VSCGFL, is implemented as a coordinated-call, current injecting generator model (IC = 1 
+! and IT = 1). Coordinated-call implementation is required to cancel the effect of the admittance of the Norton
+! equivalent applied to generators, which leads to a pure current source.  
+
+! ======================================================================================
+! MODULE DECLARATION
+! ======================================================================================
+MODULE MOD_VSCGFL_INTERNAL
+	! Internal variables
+	INTEGER :: I_STATE_DCGRID_G = -1
+END MODULE MOD_VSCGFL_INTERNAL
    
 ! ======================================================================================
 ! CURRENT INJECTIONS FOR NETWORK SOLUTION
 ! ======================================================================================
 SUBROUTINE TSCGFL(I_MACH,I_SLOT)
-      
-	!DEC$ ATTRIBUTES DLLEXPORT, DECORATE, ALIAS: "TVSCON":: TVSCON
-	!DEC$ ATTRIBUTES REFERENCE :: I_MACH,I_SLOT
-	
-	INCLUDE 'COMON4.ins'
-	IMPLICIT none
+    
+	INCLUDE 'COMON4.ins'					! common PSS/e variables and modules
+	IMPLICIT NONE
 
 	! Declaration
 	! ----------- 
-	INTEGER I_MACH, I_SLOT, IB, I_VAR, I_STATE, I_ICON		
-	INTEGER IDXCONVERTER, DCNTRLTYPE, QCNTRLTYPE, ILIMITPRIORITY
-	INTEGER issimstop
-	INTEGER NDCBUS, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS
+	INTEGER :: I_MACH, I_SLOT, IB, I_VAR		
 	  
-	REAL ps_initial, qs_initial ! initial bus active and reactive powers  
-	REAL ps, qs		 			! current bus active and reactive powers  
-	REAL icD_out, icQ_out 		! D- and Q-axis current in the system reference (DQ)	 
+	REAL :: deltas, icd, icq 			 
 
-	COMPLEX us_phasor ! bus voltage phasor
-	COMPLEX ss_phasor ! apparent power 
-	COMPLEX ic_phasor ! converter current phasor.
+	COMPLEX :: us_phasor_RI, ic_phasor_RI, ss_phasor 
+	COMPLEX :: zc, reference_transf
 
-	CHARACTER(1) IDGRID
-	
 	! Parameter assignment
 	! --------------------
 	! Index
-	IB=NUMTRM(I_MACH) ! Bus sequence number
-	I_STATE=STRTIN(2,I_SLOT) ! initial STATE index
-	I_VAR=STRTIN(3,I_SLOT)   ! initial VAR index
-	I_ICON=STRTIN(4,I_SLOT)  ! initial ICON index
-
-	! ICON	 
-	IDXCONVERTER = ICON(I_ICON)     ! index of the converter
-	DCNTRLTYPE = ICON(I_ICON+1)     ! Ps-control: 1 , Udc-control: 2, delta_s-control: 3 
-	QCNTRLTYPE = ICON(I_ICON+2)     ! Qs-control: 1 , Us-control: 2
-	ILIMITPRIORITY = ICON(I_ICON+3) ! Current limit: P-priority: 1, Q-priority: 2 and P-Q equal priority: 3 or any other integer
-	NDCBUS = ICON(I_ICON+4)           ! number of converters of the DC grid
-	IDGRID = CHRICN(I_ICON+5)       ! grid identifier
-	NDCBUS_PREVIOUS = ICON(I_ICON+6)  ! accumulated number of previous DC grid converters
-	NDCLINES_PREVIOUS = ICON(I_ICON+7)  ! accumulated number of previous DC grid converters
-	
-	
-	IF (DCNTRLTYPE.EQ.3) THEN       ! if feeding a passive grid, reactive power control is a voltage control
-		QCNTRLTYPE = 2
-	END IF
+	IB = NUMTRM(I_MACH) 					! Bus sequence number
+	I_VAR = STRTIN(3,I_SLOT)				! initial VAR index
 
 	! VARs
-	ps_initial=VAR(I_VAR) 
-	qs_initial=VAR(I_VAR+1) 
-	icD_out=VAR(I_VAR+2) 
-	icQ_out=VAR(I_VAR+3) 
-	ps=VAR(I_VAR+4) 
-	qs=VAR(I_VAR+5) 
-	issimstop=VAR(I_VAR+10)
+	icd=VAR(I_VAR+8) 
+	icq=VAR(I_VAR+9) 
 
 	! Common variables
-	us_phasor = VOLT(IB)	  
+	us_phasor_RI = VOLT(IB)	 
+	zc = ZSORCE(I_MACH)*SBASE/MBASE(I_MACH)
+
+	! RI -> dq reference system transformation: xRI = reference_transf*xdq
+	deltas = ATAN2(AIMAG(us_phasor_RI),REAL(us_phasor_RI))			
+	reference_transf = CMPLX(COS(deltas),SIN(deltas))
 
 	SELECT CASE (MODE)
 		CASE (1) 
 			! Initialization
 			! --------------
-			! Eint = V + Zsorce*I, ISORCE = Eint/Zsorce -> I = ISORCE - V/ZSORCE
+			! ec = ut + ZSORCE*ic, ISORCE = ec/ZSORCE -> ic = ISORCE - ut/ZSORCE
 			! ISORCE: norton equivalent source current in pu of SBASE
-			! I: current at generator terminal bus in pu SBASE
-			! ZSORCE: in pu of MBASE
-			ic_phasor = ISORCE(I_MACH) - us_phasor/(ZSORCE(I_MACH)*SBASE/MBASE(I_MACH)) ! 
+			! ic: current at generator terminal bus in pu SBASE
+			! ut: voltage at generator terminal bus in pu
+			! ZSORCE: in pu of MBASE -> zc = ZSORCE*SBASE/MBASE
+			ic_phasor_RI = ISORCE(I_MACH) - us_phasor_RI/zc 
+			icd = REAL(ic_phasor_RI/reference_transf)
+			icq = AIMAG(ic_phasor_RI/reference_transf) 
 						 
-			ss_phasor = us_phasor*CONJG(ic_phasor) ! in pu SBASE     
-			ps_initial = REAL(ss_phasor)
-			qs_initial = AIMAG(ss_phasor)
-			 
-			issimstop = 0    
+			ss_phasor = us_phasor_RI*CONJG(ic_phasor_RI) ! in pu SBASE     
 
 		CASE (3) 
 			! Current injections
 			! ------------------         
-			IF ((issimstop .GT. 0)) THEN
-				!WRITE (LPDEV,*) 'TVSCON::CASE3: Disconnect SVSCON at bus ', NUMTRM(IB), '.'
-				icD_out = 0.0               
-				icQ_out = 0.0
-				ps = 0.0               
-				qs = 0.0
-			END IF
-					  
-			ic_phasor = CMPLX(icD_out,icQ_out)
-			ss_phasor = us_phasor*CONJG(ic_phasor) ! in pu SBASE     
-			!ps = REAL(ss_phasor)
-			!qs = AIMAG(ss_phasor)
+			! Set ISORCE such that the current through 1/ZSORCE is cancelled 
+			! Note that the reference transformation should be done here (and not in mode 3 since the voltage 
+			! bus angle depends on the TYSL iteration
+			ic_phasor_RI = reference_transf*CMPLX(icd,icq)
+			ISORCE(I_MACH) = ic_phasor_RI + us_phasor_RI/zc  
 
-			! Add SVSCON currents       
-			ISORCE(I_MACH) = ic_phasor + us_phasor/(ZSORCE(I_MACH)*SBASE/MBASE(I_MACH))         
-
+			ss_phasor = us_phasor_RI*CONJG(ic_phasor_RI)   
+			       
 		CASE DEFAULT
 
 	END SELECT
 
 	! Re-assign algebraic variables
 	! -----------------------------
+	PELEC(I_MACH) = REAL(ss_phasor)
+	QELEC(I_MACH) = AIMAG(ss_phasor)
+	ETERM(I_MACH) = ABS(us_phasor_RI)
+
 	! VARs
-	VAR(I_VAR) = ps_initial 
-	VAR(I_VAR+1) = qs_initial 
-	VAR(I_VAR+2) = icD_out 
-	VAR(I_VAR+3) = icQ_out 
-	VAR(I_VAR+4) = ps 
-	VAR(I_VAR+5) = qs 
-	VAR(I_VAR+10) = issimstop
+	VAR(I_VAR+8) = icd
+	VAR(I_VAR+9) = icq 
 	 
-END
-      
+END SUBROUTINE TSCGFL
       
 ! ==========================================================
 ! SOLUTION OF DIFFERENTIAL EQUATIONS
 ! ==========================================================      
 SUBROUTINE VSCGFL(I_MACH,I_SLOT)
-      
-	!DEC$ ATTRIBUTES DLLEXPORT, DECORATE, ALIAS: "SVSCON":: SVSCON
-	!DEC$ ATTRIBUTES REFERENCE :: I_MACH,I_SLOT
 
-	INCLUDE 'COMON4.INS'
-	IMPLICIT none
+	USE MOD_TFBLOCKS 								! use module of generic transfer functions
+	USE MOD_VSCGFL_INTERNAL							! use module for global VSCGFL-related variables
+	INCLUDE 'COMON4.INS'							! common PSS/e variables and modules
+	IMPLICIT NONE
 	
 	! Declaration
 	! -----------
-	INTEGER IB, I_SLOT, I_MACH, I_VAR, I_CON, I_ICON, I_STATE         ! PSS/e indices
-	INTEGER I_STATE_DCGRID, I_STATE_DCGRID_G, aux_var_GLOBAL      ! local and global varible array index of the DCGRID STATE
+	INTEGER IB, I_SLOT, I_MACH, I_VAR, I_CON, I_ICON, I_STATE       ! PSS/e indices
+	INTEGER I_STATE_DCGRID      									! local index of the DCGRID STATE
 	INTEGER IDXCONVERTER, DCNTRLTYPE, QCNTRLTYPE, ILIMITPRIORITY 
-	INTEGER issimstop                                             ! disconnects unit and sets current injections to 0
+	
+	INTEGER istripvsc                                             ! disconnects unit and sets current injections to 0
 	INTEGER dcontroltype_aux, qcontroltype_aux     
 	INTEGER NDCBUS 												  ! # of buses of the dc-grid
 	INTEGER NDCBUS_PREVIOUS, NDCLINES_PREVIOUS
 	
-	INTEGER, ALLOCATABLE :: CONVERTER_ACDC_BUS(:,:) ! ac and dc buses of each converter
-	INTEGER IERR
+	INTEGER, ALLOCATABLE :: m_VSCACDCBUS(:,:) ! ac and dc buses of each converter
+	INTEGER ierr
 	REAL PI
 	PARAMETER (PI=3.14159265358979)
 	REAL DELTAT
 		
-	REAL us, delta_s, us_initial, delta_s_ini
-	REAL ps_initial, qs_initial 
+	REAL us, deltas, deltas0
+	REAL ps0, qs0 
 	REAL icd, icq ! Currents in dq.
-	REAL icd_initial, icq_initial 
+	REAL icd0, icq0 
 	REAL icD_out, icQ_out ! Currents in DQ.
 	REAL ps, qs
 
@@ -174,46 +143,39 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	REAL d_md, d_mq 	
 	REAL d_ndc, d_nq 	
 	REAL d_eta_d 
-	REAL d_udc 			! DC voltage derivative (comes from DCGRID model)
 
-	REAL aux_ilimit, awu_d, awu_q        
+	REAL aux_ilimit, antiwindupicd, antiwindupicq        
 
-	REAL ic_abs, ic_abs_puconv ! Current magnitude
+	REAL ic, ic_abs_puconv ! Current magnitude
 
-	REAL ps_ref, qs_ref, us_ref ! references
-	REAL icd_ref, icq_ref
-	REAL udc_ref
-	REAL ps_ref_aux, udc_ref_aux, qs_ref_aux, us_ref_aux
+	REAL psref, qsref, usref ! references
+	REAL icdref, icqref
+	REAL udcref
 
-	REAL idc, idc_ini, udc, udc_ini
-	REAL pdc, icc_grid
+	REAL idc, idc0, udc, udc0
+	REAL pdc
 
-	REAL ps_0, addps_ref 
-	REAL qs_0, addqs_ref       
-	REAL ec, delta_c      
+	REAL deltapsref 
+	REAL deltaqsref       
+	REAL ec, deltac      
 	REAL pvsc, qvsc
 
-	COMPLEX us_phasor ! bus voltage.
+	COMPLEX us_phasor_RI, ec_phasor_RI, ic_phasor_RI, sc_phasor ! bus voltage.
 	COMPLEX reference_transf ! convert inverter reference (dq) to system reference (DQ).
-	COMPLEX ss_phasor ! Apparent power consumed by the load.
-	COMPLEX ic_phasor ! Currents in DQ.
-	COMPLEX sc_phasor
-	COMPLEX ec_phasor
 
 	CHARACTER(1) IDGRID
-     
 
-	REAL, ALLOCATABLE :: Udc_ini_vector(:,:)
+	REAL, ALLOCATABLE :: v_udc0(:,:)
 
 	REAL TAU	
-	REAL KD_P1, KD_P2, KD_I1, KD_I2, KD_D2, KQ_P1, KQ_I1, KQ_P2, KQ_I2
+	REAL KD_Pps, KD_Pudc, KD_Ips, KD_Iudc, KD_D2, KQ_Pqs, KQ_Iqs, KQ_Pus, KQ_Ius
 	REAL ICMAX_PUconv
 	REAL PS_MAX_MW, PS_MIN_MW, QS_MAX_Mvar, QS_MIN_Mvar
 	REAL ALOSS_MW, BLOSS_kV, CLOSS_RECT_Ohm, CLOSS_INV_Ohm
 	REAL UDC_MAX, UDC_MIN, TUDCMAX, TUDCMIN
 
-	REAL ic_max
-	REAL ps_max, ps_min, qs_max, qs_min
+	REAL icmax
+	REAL psmax, psmin, qsmax, qsmin
 	REAL aloss, bloss, c_rect, c_inv
 	REAL CDC_uF, Cdc
 	REAL UDC_NOMINAL_kV
@@ -224,13 +186,13 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	INTEGER :: counter_uvdc, counter_ovdc
 	REAL :: tinitial_uvdc, tinitial_ovdc
 
-	REAL m_modulation, m_MODULATION_MAX
+	REAL fmodulationpwm, FMODULATIONPWMMAX
 
-	REAL icd_ref_p, icq_ref_p
+	REAL :: yetad, yndc, ymd, ynq, ymq
 
 	
 
-	COMMON /svsconinternal/ I_STATE_DCGRID_G, aux_var_GLOBAL ! This allows saving the value of I_STATE_DCGRID_G between calls. Note that I_STATE_DCGRID_G takes the value of the first DCGRID model read.
+	! COMMON /svsconinternal/ I_STATE_DCGRID_G, aux_var_GLOBAL ! This allows saving the value of I_STATE_DCGRID_G between calls. Note that I_STATE_DCGRID_G takes the value of the first DCGRID model read.
 
 	! Parameter assignment
 	! --------------------	  
@@ -242,16 +204,16 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	I_ICON = STRTIN(4,I_SLOT)
 		
 	! CONs    
-	TAU = CON(I_CON) ! Inverter time constant (e.g., 0.1)
-	KD_P1 = CON(I_CON+1) ! Ps control
-	KD_I1 = CON(I_CON+2)
-	KD_P2 = CON(I_CON+3) ! Udc control 
-	KD_I2 = CON(I_CON+4)
+	TAU = CON(I_CON) 		! Inverter time constant (e.g., 0.1)
+	KD_Pps = CON(I_CON+1) 	! Ps control
+	KD_Ips = CON(I_CON+2)
+	KD_Pudc = CON(I_CON+3) 	! Udc control 
+	KD_Iudc = CON(I_CON+4)
 	KD_D2 = CON(I_CON+5) ! gain of the differential control of Udc -> for the DC-voltage control, PID works much better than PI
-	KQ_P1 = CON(I_CON+6) ! Qs control
-	KQ_I1 = CON(I_CON+7)
-	KQ_P2 = CON(I_CON+8) ! Us control
-	KQ_I2 = CON(I_CON+9)
+	KQ_Pqs = CON(I_CON+6) 	! Qs control
+	KQ_Iqs = CON(I_CON+7)
+	KQ_Pus = CON(I_CON+8) 	! Us control
+	KQ_Ius = CON(I_CON+9)
 	ICMAX_PUconv = CON(I_CON+10) ! Maximum inverter current/susceptance in pu with respect to inverter rating (e.g., 1.1)
 	PS_MAX_MW = CON(I_CON+11)
 	PS_MIN_MW = CON(I_CON+12)
@@ -259,7 +221,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	QS_MIN_Mvar = CON(I_CON+14)
 	UDC_MAX = CON(I_CON+15)
 	UDC_MIN = CON(I_CON+16)
-	m_MODULATION_MAX = CON(I_CON+17)
+	FMODULATIONPWMMAX = CON(I_CON+17)
 	ALOSS_MW = CON(I_CON+18) 		! constant converter loss coefficient (MW): ploss = aloss + bloss*ic + c*ic^2
 	BLOSS_kV = CON(I_CON+19) 		! linear converter loss coefficient (kV): ploss = aloss + bloss*ic + c*ic^2
 	CLOSS_RECT_Ohm = CON(I_CON+20) 	! rectifier quadratic converter loss coefficient (ohm): ploss = aloss + bloss*ic + c*ic^2
@@ -284,39 +246,38 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	END IF
 			
 	! VARs
-	ps_initial = VAR(I_VAR) ! Reference active power, coincides with load flow values.
-	qs_initial = VAR(I_VAR+1) 
+	ps0 = VAR(I_VAR) ! Reference active power, coincides with load flow values.
+	qs0 = VAR(I_VAR+1) 
 	icD_out = VAR(I_VAR+2) 
 	icQ_out = VAR(I_VAR+3) 
 	ps = VAR(I_VAR+4) ! Active model output power. 
 	qs = VAR(I_VAR+5) 
-	icd_initial = VAR(I_VAR+6)
-	icq_initial = VAR(I_VAR+7)
+	icd0 = VAR(I_VAR+6)
+	icq0 = VAR(I_VAR+7)
 	icd = VAR(I_VAR+8)
 	icq = VAR(I_VAR+9)
-	issimstop = VAR(I_VAR+10)
-	us_initial = VAR(I_VAR+11)
-	ps_ref = VAR(I_VAR+12)
-	udc_ref = VAR(I_VAR+13)
-	qs_ref = VAR(I_VAR+14)
-	us_ref = VAR(I_VAR+15)
+	istripvsc = VAR(I_VAR+10)
+
+	udcref = VAR(I_VAR+13)
+
+	usref = VAR(I_VAR+15)
 	aux_ilimit = VAR(I_VAR+16)
-	awu_d = VAR(I_VAR+17)
-	awu_q = VAR(I_VAR+18)
+	antiwindupicd = VAR(I_VAR+17)
+	antiwindupicq = VAR(I_VAR+18)
 	ic_abs_puconv = VAR(I_VAR+19)
 	dcontroltype_aux = VAR(I_VAR+20)
 	qcontroltype_aux = VAR(I_VAR+21)
 	udc = VAR(I_VAR+22)
 	idc = VAR(I_VAR+23)
-	idc_ini = VAR(I_VAR+24)
+	idc0 = VAR(I_VAR+24)
 	pdc = VAR(I_VAR+25)
-	delta_s_ini = VAR(I_VAR+26)
-	udc_ini = VAR(I_VAR+27)
-	icd_ref = VAR(I_VAR+28)
-	addps_ref = VAR(I_VAR+29)
-	icq_ref = VAR(I_VAR+30)
-	addqs_ref = VAR(I_VAR+31)
-	m_modulation = VAR(I_VAR+32)
+	deltas0 = VAR(I_VAR+26)
+	udc0 = VAR(I_VAR+27)
+	icdref = VAR(I_VAR+28)
+	deltapsref = VAR(I_VAR+29)
+	icqref = VAR(I_VAR+30)
+	deltaqsref = VAR(I_VAR+31)
+	fmodulationpwm = VAR(I_VAR+32)
 	counter_uvdc = VAR(I_VAR+33)
 	tinitial_uvdc = VAR(I_VAR+34)
 	counter_ovdc = VAR(I_VAR+35)
@@ -343,14 +304,14 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	! Common variables
 	CALL DSRVAL('DELT', 1, DELTAT, IERR)
 	
-	ALLOCATE(Udc_ini_vector(NDCBUS,1)) ! allocate size
-	ALLOCATE(CONVERTER_ACDC_BUS(NDCBUS,2))
+	ALLOCATE(v_udc0(NDCBUS,1)) ! allocate size
+	ALLOCATE(m_VSCACDCBUS(NDCBUS,2))
 
-	ic_max = ICMAX_PUconv*MBASE(I_MACH)/SBASE ! current limit in system base
-	ps_max = PS_MAX_MW/SBASE               ! power limits in system base
-	ps_min = PS_MIN_MW/SBASE
-	qs_max = QS_MAX_Mvar/SBASE
-	qs_min = QS_MIN_Mvar/SBASE
+	icmax = ICMAX_PUconv*MBASE(I_MACH)/SBASE ! current limit in system base
+	psmax = PS_MAX_MW/SBASE               ! power limits in system base
+	psmin = PS_MIN_MW/SBASE
+	qsmax = QS_MAX_Mvar/SBASE
+	qsmin = QS_MIN_Mvar/SBASE
 
 	ZBASE = BASVLT(IB)**2/SBASE               ! AC-side Zbase in ohms
 	SDCBASE_MVA = SBASE
@@ -361,20 +322,35 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	c_rect = CLOSS_RECT_Ohm/ZBASE
 	c_inv = CLOSS_INV_Ohm/ZBASE
 	zc = ZSORCE(I_MACH)*SBASE/MBASE(I_MACH)       ! conexion impedance in system base
-	ic_abs = ic_abs_puconv*MBASE(I_MACH)/SBASE ! system base      
 	Cdc = (CDC_uF*1e-6)*ZDCBASE             ! [pu*s]
 
 	I_STATE_DCGRID = I_STATE_DCGRID_G
 	
-	us_phasor = VOLT(IB)
-	delta_s = ATAN2(AIMAG(us_phasor),REAL(us_phasor))			
+	! ec = us + ZSORCE*ic, ISORCE = ec/ZSORCE -> ic = ISORCE - us/ZSORCE
+	! ISORCE: norton equivalent source current in pu of SBASE
+	! ic: current at generator terminal bus in pu SBASE
+	! us: voltage at generator terminal bus in pu
+	! ZSORCE: in pu of MBASE -> zc = ZSORCE*SBASE/MBASE
+	us_phasor_RI = VOLT(IB)
+	us = ABS(us_phasor_RI)
+	ic_phasor_RI = ISORCE(I_MACH) - us_phasor_RI/zc
+	
+
 	! DQ -> dq reference system transformation: xDQ = reference_transf*xdq
+	deltas = ATAN2(AIMAG(us_phasor_RI),REAL(us_phasor_RI))		
 	IF (DCNTRLTYPE.EQ.3) THEN ! If feeding a passive grid, the VSC is a AC slack bus
 		reference_transf = CMPLX(1.0, 0.0) 
 	ELSE
-		reference_transf = CMPLX(cos(delta_s),sin(delta_s))
+		reference_transf = CMPLX(cos(deltas),sin(deltas))
 	END IF
-	
+
+	icd = REAL(ic_phasor_RI/reference_transf) 
+	icq = AIMAG(ic_phasor_RI/reference_transf) 
+
+	! present power and current references
+	psref = MIN(MAX(ps0 + deltapsref,psmin),psmax)
+	qsref = MIN(MAX(qs0 + deltaqsref,qsmin),qsmax)
+
 	SELECT CASE (MODE)
 
 		CASE (1) 
@@ -382,229 +358,218 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			! Inicialization 
 			! ==============	  
 			
-			! get initial value of the DC voltage state from .txt files
-			CALL SUB_READFROMFILESVSCON(Udc_ini_vector, CONVERTER_ACDC_BUS, IDGRID, NDCBUS)
+			! Get initial value of the DC voltage state from .txt files
+			CALL SUB_READFROMFILESVSCON(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
 			
-			! get STATE of dc grid model DCGRID (governor-type model)	  
-			CALL MDLIND(CONVERTER_ACDC_BUS(1,2), MACHID(I_MACH), 'GOV', 'STATE', I_STATE_DCGRID, IERR)
-			IF (IERR.NE.0) THEN ! No governor-type model
-				WRITE (LPDEV,*) 'SVSCON - CASE 1: No DCGRID model at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH)
+			! Get STATE index position of the dc grid model DCGRID (governor-type model)	  
+			CALL MDLIND(m_VSCACDCBUS(1,2), MACHID(I_MACH), 'GOV', 'STATE', I_STATE_DCGRID, ierr)
+			IF (ierr.NE.0) THEN ! No governor-type model
+				WRITE (LPDEV,*) 'VSCGFL - CASE 1: No governor-type model found at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),'.'
 			END IF
-			IF (aux_var_GLOBAL.NE.7) THEN
+			IF (I_STATE_DCGRID_G.LT.0) THEN
 				I_STATE_DCGRID_G = I_STATE_DCGRID
-				aux_var_GLOBAL = 7
 			END IF
-			
-			! Algebraic variables
-			! -------------------			
-			
-			us_initial = ABS(us_phasor)
-			delta_s_ini = delta_s
 
-			! AC-side converter current (in the dynamic simulation the C-filter is omitted)
-			ps = ps_initial
-			qs = qs_initial
-			ss_phasor = CMPLX(ps_initial,qs_initial)
-			ic_phasor = CONJG(ss_phasor/us_phasor)   
-			icd_initial = REAL(ic_phasor/reference_transf) ! in dq axes
-			icq_initial = AIMAG(ic_phasor/reference_transf) ! in dq axes
-			icd = icd_initial
-			icq = icq_initial
+			! Algebraic variables (VARS)
+			! --------------------------			
+			deltas0 = deltas
+			icd0 = icd
+			icq0 = icq
+			ps0 = us*icd
+			qs0 = -us*icq
 			
 			! AC-side converter current out of range       
-			ic_abs = ABS(CMPLX(icd_initial,icq_initial)) ! mag
-			IF (ic_abs.GT.ic_max) THEN
-				WRITE (LPDEV,*) 'SVSCON::CASE1: Current above limit.'
-				aux_ilimit = 0.0 ! out of limit -> disable integrals
-				awu_d = 0.0
-				awu_q = 0.0
-			ELSE
-				aux_ilimit = 1.0
-				awu_d = 1.0
-				awu_q = 1.0
+			ic = SQRT(icd**2+icq**2) 
+			IF (ic.GT.icmax) THEN
+				WRITE (LPDEV,*) 'VSCGFL::CASE1: Current exceeds limit of ',icmax,' pu.'
+			END IF
+			
+			! AC-side converter voltages, power
+			ec_phasor_RI = us_phasor_RI + zc*ic_phasor_RI
+			ec = ABS(ec_phasor_RI)
+			pvsc = REAL(ec_phasor_RI*CONJG(ic_phasor_RI))
+			pvsc = ps0 + REAL(zc)*(ic**2) 
+
+			! DC-side voltage, current, power
+			CALL SUB_GETPLOSS(ploss, ps0, ic, aloss, bloss, c_inv, c_rect)
+			pdc = -(pvsc + ploss)
+			udc = v_udc0(IDXCONVERTER,1) ! extract initial dc voltage value
+			udc0 = udc
+			idc0 = pdc/udc0
+			idc = idc0
+		
+			fmodulationpwm = ec/MAX(udc0,0.0001)
+			IF (fmodulationpwm.GT.FMODULATIONPWMMAX) THEN
+				WRITE (LPDEV,*) 'VSCGFL::CASE1: Modulation index exceeds limit of ',FMODULATIONPWMMAX,'.'
 			END IF
 
-			! AC-side converter voltages
-			ec_phasor = us_phasor + zc*ic_phasor
-			ec = ABS(ec_phasor)
-			delta_c = ATAN2(AIMAG(ec_phasor), REAL(ec_phasor))
-
-			! AC-side converter power
-			sc_phasor = ec_phasor*CONJG(ic_phasor) ! interesa tenerlas, pero de momento no las usamos
-			pvsc = REAL(sc_phasor)
-			qvsc = AIMAG(sc_phasor)
-			
-			! DC-side voltage, current, power
-			udc = Udc_ini_vector(IDXCONVERTER,1) ! extract initial dc voltage value
-			udc_ini = udc
-			CALL SUB_GETPLOSS(ploss, ps_initial, ic_abs, aloss, bloss, c_inv, c_rect)
-			pdc = -(pvsc+ploss)
-			idc_ini = pdc/udc_ini
-			idc = idc_ini
-			 		
-			m_modulation = ec/MAX(udc_ini,0.0001)
-
 			! references
-			ps_ref = ps_initial
-			qs_ref = qs_initial
-			us_ref = us_initial
-			udc_ref = udc_ini 
-			addps_ref = 0.0 ! supplementary controller input (SPWDRD)
-			addqs_ref = 0.0 ! supplementary controller input (SQWDRD)
-			icd_ref = icd_initial
-			icq_ref = icq_initial
+			psref = ps0
+			qsref = qs0
+			usref = us
+			udcref = udc0 
+			deltapsref = 0.0 ! supplementary controller input (SPWDRD)
+			deltaqsref = 0.0 ! supplementary controller input (SQWDRD)
+			icdref = icd0
+			icqref = icq0
 			
-			issimstop = 0
-			
-			! State variables
-			! ---------------
-			! initial values of states
-			xd = icd_initial 
-			xq = icq_initial
-			md = 0.0
-			mq = 0.0
-			ndc = 0.0
-			nq = 0.0
-			eta_d = 0.0
+			! indexes (stop simulation and anti-windup)
+			istripvsc = 0
+			antiwindupicd = 1.0
+			antiwindupicq = 1.0
 
-			ps_0 = 0.0
-			qs_0 = 0.0
-			icc_grid = idc
-			d_udc = 0.0 
-			
-			! Initialize PSS/E arrays and print 
-			! ---------------------------------
-			PMECH(I_MACH) = -pdc*SBASE/MBASE(I_MACH) ! pu machine rating
-			EFD(I_MACH) = ec
-			SPEED(I_MACH) = BSFREQ(IB)
-			ANGLE(I_MACH) = delta_c               ! in (deg), not given in rads! 
-			ETERM(I_MACH) = us_initial
-			PELEC(I_MACH) = ps_initial            ! pu system rating
-			QELEC(I_MACH) = qs_initial            ! pu system rating
-			
-			WRITE (LPDEV,*) 'SVSCON - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized.'
-			!WRITE (LPDEV,*) 'SVSCON - CASE 1: us = ',us_initial,' pu, ec = ',ec,' pu'
-			!WRITE (LPDEV,*) 'SVSCON - CASE 1: ps = ',ps,' pu, qs = ', qs, ' pu'
-			!WRITE (LPDEV,*) 'SVSCON - CASE 1: pc = ',pvsc,', pu ploss = ',ploss,' pu'
-			!WRITE (LPDEV,*) 'SVSCON - CASE 1: udc = ',udc_ini,' pu, pdc = ',-pdc,' pu'
-			!WRITE (LPDEV,*) 'SVSCON - CASE 1: idc = ',idc, ' pu'
-			!WRITE (LPDEV,*) 'SVSCON - CASE 1: icd = ',icd_initial,' pu, icq = ',icq_initial, ' pu'
+			! State variables (STATES)
+			! ------------------------
+			! Current control
+			d_xd = 0.0
+			d_xq = 0.0
+			CALL SUB_FIRSTORDERWINDUP(icdref,xd,d_xd,icdref,1,-1,DELTAT,TAU,icmax,-icmax) 				! icd
+			CALL SUB_FIRSTORDERWINDUP(icqref,xq,d_xq,icqref,1,-1,DELTAT,TAU,icmax,-icmax) 				! icq
 
-								
+			! Active power related control	
+			d_eta_d = 0.0
+			d_ndc = 0.0
+			d_md = 0.0		
+			yetad = 0.0
+			yndc = 0.0
+			ymd = 0.0
+			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),2,DELTAT,100.0,1000.0,icmax,-icmax)			! Deltas control					
+			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),2,DELTAT,KD_Pudc,KD_Iudc,icmax,-icmax)				! DC-voltage control													
+			CALL SUB_PI(ymd,md,d_md,(psref-ps),2,DELTAT,KD_Pps,KD_Ips,icmax,-icmax)						! Ps control
+
+			! Reactive power related control	
+			d_nq = 0.0
+			d_mq = 0.0
+			ynq = 0.0
+			ymq = 0.0
+			CALL SUB_PI(ynq,nq,d_nq,(usref-us),2,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control													
+			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),2,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
+
+			PMECH(I_MACH) = -pdc				! pu system rating
+			SPEED(I_MACH) = BSFREQ(IB)            		
+			ETERM(I_MACH) = us
+			PELEC(I_MACH) = ps0            		! pu system rating
+			QELEC(I_MACH) = qs0            		! pu system rating
+			
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized.'
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: D-control: ',DCNTRLTYPE,' Q-control: ',QCNTRLTYPE,' I-limit priority: ',ILIMITPRIORITY
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: us = ',us,' pu, ec = ',ec,' pu'
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: ps = ',ps0,' pu, qs = ', qs0, ' pu'
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: pc = ',pvsc,', pu ploss = ',ploss,' pu'
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: udc = ',udc,' pu, pdc = ',-pdc,' pu'
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: idc = ',idc, ' pu'
+			WRITE (LPDEV,*) 'VSCGFL - CASE 1: icd = ',icd,' pu, icq = ',icq, ' pu'
+							
 	CASE (2) 
 	   
 		! Compute derivatives
 		! ===================
-		us = ABS(us_phasor) 		
 
-		! get DC voltage of the DC grid model (if any, else from VARs)
+		! Get DC voltage of the DC grid model (if any, else from VARs)
 		IF (I_STATE_DCGRID.GT.0) THEN
 			udc = STATE(I_STATE_DCGRID + IDXCONVERTER + NDCLINES_PREVIOUS + NDCBUS_PREVIOUS - 1)
 		END IF
 
-		ps_ref_aux = ps_ref
-		qs_ref_aux = qs_ref
-		udc_ref_aux = udc_ref
-		us_ref_aux = us_ref		
-		
-		icd_ref_p = icd_ref
-		icq_ref_p = icq_ref
-								   
-		! Compute derivatives
-		IF (TAU.LT.(2*DELTAT)) THEN								! current control
-			d_xd = 0.0
-			d_xq = 0.0
-			xd = icd_ref_p
-			xq = icq_ref_p
-		ELSE
-			d_xd = (icd_ref_p - xd)/TAU
-			d_xq = (icq_ref_p - xq)/TAU
+		! Current control
+		CALL SUB_FIRSTORDERWINDUP(icd,xd,d_xd,icdref,2,0,DELTAT,TAU,icmax,-icmax) 						! icd
+		CALL SUB_FIRSTORDERWINDUP(icq,xq,d_xq,icqref,2,0,DELTAT,TAU,icmax,-icmax) 						! icq
+
+		! Active power related control
+		IF(DCNTRLTYPE.EQ.3) THEN 							
+			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),2,DELTAT,100.0,1000.0,icmax,-icmax)		! Deltas control
+		ELSE IF(DCNTRLTYPE.EQ.2) THEN						
+			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),2,DELTAT,KD_Pudc,KD_Iudc,icmax,-icmax)				! DC-voltage control
+		ELSE 													
+			CALL SUB_PI(ymd,md,d_md,(psref-ps),2,DELTAT,KD_Pps,KD_Ips,icmax,-icmax)						! Ps control
 		END IF
 
-		IF(dcontroltype_aux.EQ.3) THEN 							! delta_s control
-			d_md = 0.0
-			d_ndc = 0.0
-			d_eta_d = (1000.0)*(delta_s_ini - delta_s)*awu_d
-		ELSE IF(dcontroltype_aux.EQ.2) THEN						! DC-voltage control
-			d_md = 0.0
-			d_ndc = KD_I2*(udc_ref_aux - udc)*awu_d
-			d_eta_d = 0.0
-		ELSE 													! Ps control
-			d_md = KD_I1*(ps_ref_aux - ps)*awu_d 
-			d_ndc = 0.0
-			d_eta_d = 0.0
+		! Reactive power related control	
+		IF(QCNTRLTYPE.EQ.2) THEN
+			CALL SUB_PI(ynq,nq,d_nq,(usref-us),2,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control
+		ELSE 													
+			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),2,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
 		END IF
 
-		IF(qcontroltype_aux.EQ.2) THEN							! Us control
-			d_mq = 0.0
-			d_nq = KQ_I2*(us_ref_aux - us)*awu_q 
-		ELSE 													! Qs control
-			d_mq = KQ_I1*(qs_ref_aux - qs)*awu_q 
-			d_nq = 0.0
-		END IF
+		! Apply anti-wind up indicators of current control: if current reaches a limit, temporarily cancel corresponding active and reactive power control
+		d_ndc = d_ndc*antiwindupicd
+		d_md = d_md*antiwindupicd
+		d_eta_d = d_eta_d*antiwindupicd
+		d_nq = d_nq*antiwindupicq
+		d_mq = d_mq*antiwindupicq
 		   
 	CASE (3) 
 
 		! Compute output
 		! ==============
-		us = ABS(us_phasor) 
 
-		! get DC voltage into the DC grid (if any, else from VARs)
+		! Get DC voltage into the DC grid (if any, else from VARs)
 		IF (I_STATE_DCGRID.GT.0) THEN
 			udc = STATE(I_STATE_DCGRID + IDXCONVERTER + NDCLINES_PREVIOUS + NDCBUS_PREVIOUS - 1)
 		END IF
 
-		! update and compute references	
-		ps_ref = ps_initial + addps_ref ! P: operation reference + additional supplementary reference (for ex: droop)
-		qs_ref = qs_initial + addqs_ref ! Q: operation reference + additional supplementary reference (for ex: droop)
-		
-		dcontroltype_aux = DCNTRLTYPE
-		qcontroltype_aux = QCNTRLTYPE		
-		CALL SUB_SETIREF(dcontroltype_aux, qcontroltype_aux, ps_ref, qs_ref, udc_ref, us_ref, icd_ref, icq_ref, & 
-			md, mq, ndc, nq, eta_d, us, delta_s, ps, qs, udc, icd_initial, icq_initial, delta_s_ini, &
-			ps_max, ps_min, qs_max, qs_min, UDC_MAX, UDC_MIN, KD_P1, KD_P2, KD_D2, KQ_P1, KQ_P2)
+		! Current control
+		CALL SUB_FIRSTORDERWINDUP(icd,xd,d_xd,icdref,3,0,DELTAT,TAU,icmax,-icmax) 						! icd
+		CALL SUB_FIRSTORDERWINDUP(icq,xq,d_xq,icqref,3,0,DELTAT,TAU,icmax,-icmax) 						! icq
+
+		! Active power related control
+		IF(DCNTRLTYPE.EQ.3) THEN 							
+			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),3,DELTAT,100.0,1000.0,icmax,-icmax)		! Deltas control
+			icdref = icd0 + yetad
+		ELSE IF(DCNTRLTYPE.EQ.2) THEN						
+			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),3,DELTAT,KD_Pudc,KD_Iudc,icmax,-icmax)				! DC-voltage control
+			icdref = icd0 - yndc
+		ELSE 													
+			CALL SUB_PI(ymd,md,d_md,(psref-ps),3,DELTAT,KD_Pps,KD_Ips,icmax,-icmax)						! Ps control
+			icdref = psref/us + ymd
+		END IF
+
+		! Reactive power related control	
+		IF(QCNTRLTYPE.EQ.2) THEN
+			CALL SUB_PI(ynq,nq,d_nq,(usref-us),3,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control
+			icqref = MAX(MIN(icq0 - ynq,-qs_min/us),-qs_max/us)	
+		ELSE 													
+			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),3,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
+			icqref = -qsref/us - ymq
+		END IF
 		
 		! limit current references and set anti-wind up indicators
-		m_modulation = ec/MAX(udc,0.0001)
-		CALL SUB_LIMITIREF(icd_ref, icq_ref, aux_ilimit, awu_d, awu_q, us_phasor, udc, ILIMITPRIORITY, ic_max, m_MODULATION_MAX, zc)		
+		CALL SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)		
 		
 		! DC protection
-		CALL SUB_OVDCPROT(issimstop, udc, TIME, tinitial_ovdc, counter_ovdc, UDC_MAX, TUDCMAX)
-		CALL SUB_UVDCPROT(issimstop, udc, TIME, tinitial_uvdc, counter_uvdc, UDC_MIN, TUDCMIN)
-		
-		icd = 0.0
-		icq = 0.0
-		IF (issimstop.LT.1) THEN		  
-			icd = xd
-			icq = xq
+		CALL SUB_OVDCPROT(istripvsc, udc, TIME, tinitial_ovdc, counter_ovdc, UDC_MAX, TUDCMAX)
+		CALL SUB_UVDCPROT(istripvsc, udc, TIME, tinitial_uvdc, counter_uvdc, UDC_MIN, TUDCMIN)
+				
+		IF (istripvsc.GT.0) THEN		  
+			icd = 0.0
+			icq = 0.0
 		END IF
 		
 		! AC-side converter current, voltage, power 
-		ps = us*icd ! same as ps = REAL(ss_vec)
+		ps = us*icd 
 		qs = -us*icq ! qs = AIMAG(ss_vec)	
-		ic_phasor = reference_transf*CMPLX(icd,icq) ! dq -> DQ, pu in system rating	
-		ec_phasor = us_phasor + zc*ic_phasor ! converter voltage -> output		
-		sc_phasor = ec_phasor*CONJG(ic_phasor) ! interesa tenerlas, pero de momento no las usamos
-		ic_abs = ABS(ic_phasor) ! mag
-		icD_out = REAL(ic_phasor) 
-		icQ_out = AIMAG(ic_phasor)
-		ec = ABS(ec_phasor)
-		delta_c = ATAN2(AIMAG(ec_phasor), REAL(ec_phasor))
+		ic_phasor_RI = reference_transf*CMPLX(icd,icq) ! dq -> DQ, pu in system rating	
+		ec_phasor_RI = us_phasor_RI + zc*ic_phasor_RI ! converter voltage -> output		
+		sc_phasor = ec_phasor_RI*CONJG(ic_phasor_RI) ! interesa tenerlas, pero de momento no las usamos
+		ic = ABS(ic_phasor_RI) ! mag
+		icD_out = REAL(ic_phasor_RI) 
+		icQ_out = AIMAG(ic_phasor_RI)
+		ec = ABS(ec_phasor_RI)
+		deltac = ATAN2(AIMAG(ec_phasor_RI), REAL(ec_phasor_RI))
 		pvsc = REAL(sc_phasor)
 		qvsc = AIMAG(sc_phasor)
+		fmodulationpwm = ec/MAX(udc,0.0001)
 
 		! DC-side converter current current and power
-		CALL SUB_GETPLOSS(ploss, ps, ic_abs, aloss, bloss, c_inv, c_rect)	
-		pdc = -(pvsc+ploss) ! the same... only necessary one of them output of the converter model; input of the DC-grid model
+		CALL SUB_GETPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)	
+		pdc = -(pvsc + ploss) 
 		idc = pdc/udc ! output of the converter model; input of the DC-grid model
 		
+		PMECH(I_MACH) = -pdc 						! in pu system rating
 		SPEED(I_MACH) = BSFREQ(IB)
-		ANGLE(I_MACH) = delta_c ! in (deg), not given in rads!!
 		ETERM(I_MACH) = us
-		PELEC(I_MACH) = ps ! in pu system rating
-		QELEC(I_MACH) = qs ! in pu system rating
-		PMECH(I_MACH) = -pdc*SBASE/MBASE(I_MACH) ! in pu machine rating
-		EFD(I_MACH) = ec
+		PELEC(I_MACH) = ps 							! in pu system rating
+		QELEC(I_MACH) = -us*icq 					! in pu system rating
+		
 				  
 	CASE (4) 
 
@@ -626,43 +591,49 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 
 	! RE-ASSIGN VARIABLES
 	! -------------------	  
-	icd = xd ! sólo era para identificar mejor los estados
+	icd = xd ! sï¿½lo era para identificar mejor los estados
 	icq = xq
 
 	! VARs	  
-	VAR(I_VAR) = ps_initial  
-	VAR(I_VAR+1) = qs_initial 
+	VAR(I_VAR) = ps0					! To SPWDRD (not really needed) 
+	VAR(I_VAR+1) = qs0 					! To SQWDRD (not really needed)
+	VAR(I_VAR+26) = deltas0
+	VAR(I_VAR+6) = icd0
+	VAR(I_VAR+7) = icq0
+
+	VAR(I_VAR+13) = udcref				! To SPWDRD
+	VAR(I_VAR+15) = usref
+	VAR(I_VAR+28) = icdref 
+	VAR(I_VAR+30) = icqref
+	VAR(I_VAR+29) = deltapsref 			! From SPWDRD
+	VAR(I_VAR+31) = deltaqsref			! From SQWDRD
+
 	VAR(I_VAR+2) = icD_out 
 	VAR(I_VAR+3) = icQ_out 
 	VAR(I_VAR+4) = ps 
 	VAR(I_VAR+5) = qs 
-	VAR(I_VAR+6) = icd_initial
-	VAR(I_VAR+7) = icq_initial
 	VAR(I_VAR+8) = icd
 	VAR(I_VAR+9) = icq
-	VAR(I_VAR+10) = issimstop
-	VAR(I_VAR+11) = us_initial
-	VAR(I_VAR+12) = ps_ref
-	VAR(I_VAR+13) = udc_ref
-	VAR(I_VAR+14) = qs_ref
-	VAR(I_VAR+15) = us_ref
+
+	VAR(I_VAR+10) = istripvsc
 	VAR(I_VAR+16) = aux_ilimit
-	VAR(I_VAR+17) = awu_d
-	VAR(I_VAR+18) = awu_q
+	VAR(I_VAR+17) = antiwindupicd
+	VAR(I_VAR+18) = antiwindupicq
 	VAR(I_VAR+19) = ic_abs_puconv
 	VAR(I_VAR+20) = dcontroltype_aux
 	VAR(I_VAR+21) = qcontroltype_aux
-	VAR(I_VAR+22) = udc
+
+	VAR(I_VAR+25) = pdc					! To DCGRID
+	VAR(I_VAR+22) = udc					! To SPWDRD
 	VAR(I_VAR+23) = idc
-	VAR(I_VAR+24) = idc_ini
-	VAR(I_VAR+25) = pdc
-	VAR(I_VAR+26) = delta_s_ini
-	VAR(I_VAR+27) = udc_ini
-	VAR(I_VAR+28) = icd_ref 
-	VAR(I_VAR+29) = addps_ref 
-	VAR(I_VAR+30) = icq_ref
-	VAR(I_VAR+31) = addqs_ref
-	VAR(I_VAR+32) = m_modulation
+
+	VAR(I_VAR+27) = udc0
+	VAR(I_VAR+24) = idc0
+
+	
+
+
+	VAR(I_VAR+32) = fmodulationpwm
 	VAR(I_VAR+33) = counter_uvdc
 	VAR(I_VAR+34) = tinitial_uvdc
 	VAR(I_VAR+35) = counter_ovdc
@@ -686,13 +657,17 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	DSTATE(I_STATE+5) = d_nq    
 	DSTATE(I_STATE+6) = d_eta_d 
       
-END 
+END SUBROUTINE VSCGFL
 
-SUBROUTINE SUB_READFROMFILESVSCON(Udc_ini_vector, CONVERTER_ACDC_BUS, IDGRID, NDCBUS)
+! ======================================================================================
+! OTHER SUBROUTINES
+! ======================================================================================
+
+SUBROUTINE SUB_READFROMFILESVSCON(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
 	
 	CHARACTER(1) :: IDGRID, line_header 
-	INTEGER :: NDCBUS, CONVERTER_ACDC_BUS(NDCBUS,1), ivsc ! ac and dc buses of each converter
-	REAL :: Udc_ini_vector(NDCBUS,1)
+	INTEGER :: NDCBUS, m_VSCACDCBUS(NDCBUS,1), ivsc ! ac and dc buses of each converter
+	REAL :: v_udc0(NDCBUS,1)
 	
 	OPEN(UNIT=20, FILE='.\data_acdcbus.txt') ! .txt files where .dll is located
 	OPEN(UNIT=21, FILE='.\data_Udc_ini.txt')
@@ -708,166 +683,91 @@ SUBROUTINE SUB_READFROMFILESVSCON(Udc_ini_vector, CONVERTER_ACDC_BUS, IDGRID, ND
 	END DO
 
 	DO ivsc=1,NDCBUS
-		READ(20,*)CONVERTER_ACDC_BUS(ivsc,1),CONVERTER_ACDC_BUS(ivsc,2)
-		READ(21,*)Udc_ini_vector(ivsc,1)
+		READ(20,*)m_VSCACDCBUS(ivsc,1),m_VSCACDCBUS(ivsc,2)
+		READ(21,*)v_udc0(ivsc,1)
 	END DO
 	CLOSE(20)
 	CLOSE(21)
 
-END 
+END SUBROUTINE SUB_READFROMFILESVSCON
 
-SUBROUTINE SUB_GETPLOSS(ploss, ps, ic_abs, aloss, bloss, c_inv, c_rect)
+SUBROUTINE SUB_GETPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)
 	
-	REAL :: ploss, ps, ic_abs, aloss, bloss, c_inv, c_rect
+	REAL, INTENT(OUT) :: ploss
+	REAL, INTENT(IN) :: ps, ic, aloss, bloss, c_inv, c_rect
 
 	IF (ps.GE.0.0) THEN 
-		ploss = aloss + bloss*ic_abs + c_inv*ic_abs**2  ! inverter
+		ploss = aloss + bloss*ic + c_inv*ic**2  ! inverter
 	ELSE 
-		ploss = aloss + bloss*ic_abs + c_rect*ic_abs**2 ! rectifier
+		ploss = aloss + bloss*ic + c_rect*ic**2 ! rectifier
 	END IF
 
-END
+END SUBROUTINE SUB_GETPLOSS
+    
+SUBROUTINE SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)
 
-SUBROUTINE SUB_SETIREF(dcontroltype_aux, qcontroltype_aux, ps_ref, qs_ref, udc_ref, us_ref, icd_ref, icq_ref, & 
-	md, mq, ndc, nq, eta_d, us, delta_s, ps, qs, udc, icd_initial, icq_initial, delta_s_ini, &
-	ps_max, ps_min, qs_max, qs_min, UDC_MAX, UDC_MIN, KD_P1, KD_P2, KD_D2, KQ_P1, KQ_P2)
-
-	INTEGER :: dcontroltype_aux, qcontroltype_aux
-	REAL :: md, mq, ndc, nq, eta_d
-	REAL :: us, delta_s, ps, qs, udc
-	REAL :: ps_ref, qs_ref, udc_ref, idc_ref, us_ref, icd_ref, icq_ref, ps_ref_aux, udc_ref_aux, qs_ref_aux, us_ref_aux
-	REAL :: icd_initial, icq_initial, delta_s_ini
-	REAL :: ps_max, ps_min, qs_max, qs_min, UDC_MAX, UDC_MIN, KD_P1, KD_P2, KD_D2, KQ_P1, KQ_P2
-
-	! limit total references (power and voltage)
-	ps_ref_aux = ps_ref
-	udc_ref_aux = udc_ref
-	qs_ref_aux = qs_ref
-	us_ref_aux = us_ref
+	INTEGER, INTENT(IN) :: ILIMITPRIORITY
+	REAL, INTENT(IN) :: us, udc, icmax, FMODULATIONPWMMAX
+	COMPLEX, INTENT(IN) :: zc
 	
-	ps_ref_aux = MIN(MAX(ps_ref,ps_min),ps_max)
-	qs_ref_aux = MIN(MAX(qs_ref,qs_min),qs_max)
+	REAL, INTENT(INOUT) :: icdref, icqref, antiwindupicd, antiwindupicq
+
+	REAL :: icref, ecmax, ecref, deltacref
+	COMPLEX :: icref_phasor_dq, ecref_phasor_dq, us_phasor_dq
 	
-	!IF ((udc_ref.GT.UDC_MAX).OR.udc_ref.LT.UDC_MIN) THEN	! DC voltage reference exceeding voltage limits. This could happen if DC-voltage control VSC is lost and the other VSC must take over, being so far under control of Ps (where udcref = udc). However, in MTDC the possibility for multiple PI DC voltage controller coud appear and by now aprubt current set point changes are resulting
-	!	dcontroltype_aux = 2 								! control of Udc (DCNTRLTYPE = 2)
-	!	udc_ref_aux = MIN(MAX(udc_ref,UDC_MIN),UDC_MAX)
-	!END IF
 
-	! current controller references: icd and icq
-	IF(qcontroltype_aux.EQ.2) THEN 											! control of Us
-		icq_ref = icq_initial - KQ_P2*(us_ref_aux - us) - nq     			! -(icq0 + Kq2*(usref  - us) + nq), icq = qs0/usref, usref = us0
-		!qs_ref_aux = -us_ref_aux*icq_ref 						    		! reactive power needed for Us control		  
-		!IF ((qs_ref_aux.GT.qs_max).OR.(qs_ref_aux.LT.qs_min)) THEN
-		!	qcontroltype_aux = 1 											! control of Qs and set reactive power set point
-		!	qs_ref_aux = MIN(MAX(qs_ref_aux,qs_min),qs_max)
-		!	icq_ref = -qs_ref_aux/us - KQ_P1*(qs_ref_aux - qs) - mq
-		!END IF		  
-	ELSE 																	! control of Qs
-		icq_ref = -qs_ref_aux/us - KQ_P1*(qs_ref_aux - qs) - mq 			! -(qsref/us + Kq1*(qsref - qs) + mq)		  
-		!us_ref_aux = -qs_ref_aux/icq_ref ! for some calculus  
-	END IF
-
-	IF(dcontroltype_aux.EQ.3) THEN 									     	! Passive grid
-		icd_ref = icd_initial + (100.0)*(delta_s_ini - delta_s) + eta_d      	! keep delta_s to 0 -> slack bus behavior	  
-		!udc_ref_aux = udc
-	ELSE IF (dcontroltype_aux.EQ.2) THEN							      	! DC voltage control
-		!idc_ref = icc_grid - KD_D2*d_udc + KD_P2*(udc_ref_aux - udc) + ndc ! PID DC voltage control 
-		!icd_ref = (-1/ec_d)*(ec_q*icq + udc*idc_ref + ploss) 				! comes from ' pvsc + pdc + ploss = 0 '
-		icd_ref = icd_initial - KD_P2*(udc_ref_aux - udc) - ndc  				! icd0 - (Kd2*(udcref - udc) + ndc), icd0 = psref/usref
-	ELSE 																    ! AC active power control
-		icd_ref = ps_ref_aux/us + KD_P1*(ps_ref_aux - ps) + md 				! psref/us + (Kd1*(psref - ps) + mdc)		  
-		!udc_ref_aux = udc												 	
-	END IF
-	
-	ps_ref  = ps_ref_aux
-	qs_ref = qs_ref_aux
-	us_ref = us_ref_aux
-	udc_ref = udc_ref_aux
-
-END
-      
-SUBROUTINE SUB_LIMITIREF(icd_ref, icq_ref, aux_ilimit, awu_d, awu_q, us_phasor, udc, ILIMITPRIORITY, ic_max, m_MODULATION_MAX, zc)
-
-	INTEGER :: ILIMITPRIORITY
-	REAL :: icd_ref, icq_ref, aux_ilimit, awu_d, awu_q
-	REAL :: icd_ref_aux, icq_ref_aux, ic_abs_ref, coseno_alpha_ref, seno_alpha_ref, ec_max, ec_ref, delta_c_ref, icd_ref_p, icq_ref_p
-	COMPLEX :: us_phasor, ic_ref_phasor, ec_ref_phasor, ec_ref_phasor_p, ic_ref_phasor_p
-	COMPLEX :: zc
-	REAL :: udc, ic_max, m_MODULATION_MAX
-
-	! Check current limits
-	icd_ref_aux = icd_ref
-	icq_ref_aux = icq_ref
-	ic_abs_ref = SQRT(icd_ref**2 + icq_ref**2)
-	coseno_alpha_ref = icd_ref/ic_abs_ref
-	seno_alpha_ref = icq_ref/ic_abs_ref
-	IF (ic_abs_ref.GT.ic_max) THEN
-		aux_ilimit = 0.0 ! out of limit -> disable integrals
-		IF (ILIMITPRIORITY.EQ.1) THEN ! P-priority
-		  
-			awu_q = 0.0 ! icq will be always on the limit in this case
-			IF (ABS(icd_ref).GT.ic_max) THEN
-				awu_d = 0.0 ! icd is on the limit
+	! Check current limits (icref <= icmax)
+	icref = SQRT(icdref**2 + icqref**2)
+	IF (icref.GT.icmax) THEN
+		IF (ILIMITPRIORITY.EQ.1) THEN 								! P-priority		  
+			antiwindupicq = 0.0 											! icq will be always on the limit in this case
+			IF (ABS(icdref).GT.icmax) THEN
+				antiwindupicd = 0.0 										! icd is on the limit
 			ELSE
-				awu_d = 1.0 ! icd<=ic_max
+				antiwindupicd = 1.0 										
 			END IF
-			icd_ref_aux = MIN(ABS(icd_ref), ic_max)*SIGN(1.0,icd_ref) ! change the current reference: icq_ref = icq_ref_aux
-			icq_ref_aux = SQRT(ic_max**2 - icd_ref_aux**2)*SIGN(1.0,icq_ref)
-		  
-		ELSE IF (ILIMITPRIORITY.EQ.2) THEN ! Q-priority
-		  
-			awu_d = 0.0 ! icq will be always on the limit in this case
-			IF (ABS(icq_ref).GT.ic_max) THEN
-				awu_q = 0.0 ! icq is on the limit
+			icdref = MIN(ABS(icdref), icmax)*SIGN(1.0,icdref) 		
+			icqref = SQRT(icmax**2 - icdref**2)*SIGN(1.0,icqref)		  
+		ELSE IF (ILIMITPRIORITY.EQ.2) THEN 							! Q-priority
+			antiwindupicd = 0.0 											! icq will be always on the limit in this case
+			IF (ABS(icqref).GT.icmax) THEN
+				antiwindupicq = 0.0 										! icq is on the limit
 			ELSE
-				awu_q = 1.0 ! icq<=ic_max
+				antiwindupicq = 1.0 										
 			END IF
-			icq_ref_aux = MIN(ABS(icq_ref), ic_max)*SIGN(1.0,icq_ref) ! change the current reference: icq_ref = icq_ref_aux
-			icd_ref_aux = SQRT(ic_max**2 - icq_ref_aux**2)*SIGN(1.0,icd_ref)
-		  
-		ELSE ! P-Q equal priority
-		  
-			awu_d = 0.0
-			awu_q = 0.0
-			icd_ref_aux = ic_max*coseno_alpha_ref
-			icq_ref_aux = ic_max*seno_alpha_ref
-		  
-		END IF
-	  
+			icqref = MIN(ABS(icqref), icmax)*SIGN(1.0,icqref) 		! change the current reference: icqref = icq_ref_aux
+			icdref = SQRT(icmax**2 - icqref**2)*SIGN(1.0,icdref)		  
+		ELSE 														! P-Q equal priority 
+			antiwindupicd = 0.0
+			antiwindupicq = 0.0
+			icdref = icmax*icdref/icref
+			icqref = icmax*icqref/icref	  
+		END IF  
 	ELSE
-		aux_ilimit = 1.0
-		awu_d = 1.0
-		awu_q = 1.0
+		antiwindupicd = 1.0
+		antiwindupicq = 1.0
 	END IF
 
-
-	! Check Maximum modulation index (ec <= m_MODULATION_MAX*udc)
-	ec_max = m_MODULATION_MAX*udc
-	ic_ref_phasor = CMPLX(icd_ref_aux, icq_ref_aux) 
-	ec_ref_phasor = us_phasor + zc*ic_ref_phasor
-	ec_ref = ABS(ec_ref_phasor)
-	delta_c_ref = ATAN2(AIMAG(ec_ref_phasor), REAL(ec_ref_phasor))
-	
-
-	IF (ec_ref.GT.ec_max) THEN	  
-		ec_ref_phasor_p = CMPLX(ec_max*cos(delta_c_ref), ec_max*sin(delta_c_ref)) 	  
-		ic_ref_phasor_p = (ec_ref_phasor_p - us_phasor)/zc
-		icd_ref_p = REAL(ic_ref_phasor_p)
-		icq_ref_p = AIMAG(ic_ref_phasor_p)
-	ELSE
-		icd_ref_p = icd_ref_aux
-		icq_ref_p = icq_ref_aux  
+	! Check maximum modulation index (ec <= FMODULATIONPWMMAX*udc)
+	ecmax = FMODULATIONPWMMAX*udc
+	us_phasor_dq = CMPLX(us, 0.0)
+	icref_phasor_dq = CMPLX(icdref, icqref) 
+	ecref_phasor_dq = us_phasor_dq + zc*icref_phasor_dq
+	ecref = ABS(ecref_phasor_dq)
+	deltacref = ATAN2(AIMAG(ecref_phasor_dq), REAL(ecref_phasor_dq))
+	IF (ecref.GT.ecmax) THEN	  
+		ecref_phasor_dq = CMPLX(ecmax*cos(deltacref), ecmax*sin(deltacref)) 	  
+		icref_phasor_dq = (ecref_phasor_dq - us_phasor_dq)/zc
+		icdref = REAL(icref_phasor_dq)
+		icqref = AIMAG(icref_phasor_dq) 
 	END IF
-
-	icd_ref = icd_ref_p
-	icq_ref = icq_ref_p
 	
-END
+END SUBROUTINE SUB_LIMITIREF
 
-SUBROUTINE SUB_OVDCPROT(issimstop, udc, timenow, tinitial1, counter1, UDC_MAX, TUDCMAX)
+SUBROUTINE SUB_OVDCPROT(istripvsc, udc, timenow, tinitial1, counter1, UDC_MAX, TUDCMAX)
 
 	IMPLICIT NONE
-	INTEGER :: issimstop, counter1
+	INTEGER :: istripvsc, counter1
 	REAL :: udc, timenow, tinitial1
 	REAL :: UDC_MAX, TUDCMAX
 	
@@ -879,19 +779,19 @@ SUBROUTINE SUB_OVDCPROT(issimstop, udc, timenow, tinitial1, counter1, UDC_MAX, T
 		END IF  
 
 		IF ((timenow - tinitial1).GT.TUDCMAX) THEN
-			issimstop = 1
+			istripvsc = 1
 		END IF 
 	
 	ELSE
 		tinitial1 = timenow
 		counter1 = 0
 	END IF
-END
+END SUBROUTINE SUB_OVDCPROT
 
-SUBROUTINE SUB_UVDCPROT(issimstop, udc, timenow, tinitial1, counter1, UDC_MIN, TUDCMIN)
+SUBROUTINE SUB_UVDCPROT(istripvsc, udc, timenow, tinitial1, counter1, UDC_MIN, TUDCMIN)
 
 	IMPLICIT NONE
-	INTEGER :: issimstop, counter1
+	INTEGER :: istripvsc, counter1
 	REAL :: udc, timenow, tinitial1
 	REAL :: UDC_MIN, TUDCMIN
 	
@@ -903,11 +803,11 @@ SUBROUTINE SUB_UVDCPROT(issimstop, udc, timenow, tinitial1, counter1, UDC_MIN, T
 		END IF  
 
 		IF ((timenow - tinitial1).GT.TUDCMIN) THEN
-			issimstop = 1
+			istripvsc = 1
 		END IF 
 	
 	ELSE
 		tinitial1 = timenow
 		counter1 = 0
 	END IF
-END
+END SUBROUTINE SUB_UVDCPROT

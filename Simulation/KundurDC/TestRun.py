@@ -1,4 +1,5 @@
 # File:"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HY_ACDC_SIM2\Version2023\Dynamic\TestRun.py", generated on TUE, JUN 11 2024  11:48, PSS(R)E release 34.06.01
+import os
 import psse34
 import psspy, redirect
 redirect.psse2py()
@@ -7,6 +8,8 @@ import dyntools
 from matplotlib import pyplot as plt
 from matplotlib.font_manager import FontProperties
 import numpy as np
+
+os.chdir(r"""C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC""")
 
 psspy.psseinit(2000)
 
