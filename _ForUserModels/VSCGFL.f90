@@ -107,6 +107,7 @@ END SUBROUTINE TSCGFL
 SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 
 	USE MOD_TFBLOCKS 								! use module of generic transfer functions
+	USE MOD_PROTECTION								! use module of protection functions
 	USE MOD_VSCGFL_INTERNAL							! use module for global VSCGFL-related variables
 	INCLUDE 'COMON4.INS'							! common PSS/e variables and modules
 	IMPLICIT NONE
@@ -526,7 +527,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		! Reactive power related control	
 		IF(QCNTRLTYPE.EQ.2) THEN
 			CALL SUB_PI(ynq,nq,d_nq,(usref-us),3,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control
-			icqref = MAX(MIN(icq0 - ynq,-qs_min/us),-qs_max/us)	
+			icqref = -MAX(MIN(-us*(icq0 - ynq),qsmin),qsmax)/us
 		ELSE 													
 			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),3,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
 			icqref = -qsref/us - ymq
@@ -536,8 +537,8 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		CALL SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)		
 		
 		! DC protection
-		CALL SUB_OVDCPROT(istripvsc, udc, TIME, tinitial_ovdc, counter_ovdc, UDC_MAX, TUDCMAX)
-		CALL SUB_UVDCPROT(istripvsc, udc, TIME, tinitial_uvdc, counter_uvdc, UDC_MIN, TUDCMIN)
+		CALL SUB_OVDCPROT(istripvsc, counter_ovdc, tinitial_ovdc, udc, TIME, UDC_MAX, TUDCMAX, NUMBUS(IB),'VSCGFL',LPDEV)
+		CALL SUB_UVDCPROT(istripvsc, counter_uvdc, tinitial_uvdc, udc, TIME, UDC_MIN, TUDCMIN, NUMBUS(IB),'VSCGFL',LPDEV)
 				
 		IF (istripvsc.GT.0) THEN		  
 			icd = 0.0
@@ -763,51 +764,3 @@ SUBROUTINE SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, 
 	END IF
 	
 END SUBROUTINE SUB_LIMITIREF
-
-SUBROUTINE SUB_OVDCPROT(istripvsc, udc, timenow, tinitial1, counter1, UDC_MAX, TUDCMAX)
-
-	IMPLICIT NONE
-	INTEGER :: istripvsc, counter1
-	REAL :: udc, timenow, tinitial1
-	REAL :: UDC_MAX, TUDCMAX
-	
-	IF (udc.GT.UDC_MAX) THEN 
-
-		IF (counter1 .EQ. 0.0) THEN
-			tinitial1 = timenow
-			counter1 = 1
-		END IF  
-
-		IF ((timenow - tinitial1).GT.TUDCMAX) THEN
-			istripvsc = 1
-		END IF 
-	
-	ELSE
-		tinitial1 = timenow
-		counter1 = 0
-	END IF
-END SUBROUTINE SUB_OVDCPROT
-
-SUBROUTINE SUB_UVDCPROT(istripvsc, udc, timenow, tinitial1, counter1, UDC_MIN, TUDCMIN)
-
-	IMPLICIT NONE
-	INTEGER :: istripvsc, counter1
-	REAL :: udc, timenow, tinitial1
-	REAL :: UDC_MIN, TUDCMIN
-	
-	IF (udc.LT.UDC_MIN) THEN 
-
-		IF (counter1 .EQ. 0.0) THEN
-			tinitial1 = timenow
-			counter1 = 1
-		END IF  
-
-		IF ((timenow - tinitial1).GT.TUDCMIN) THEN
-			istripvsc = 1
-		END IF 
-	
-	ELSE
-		tinitial1 = timenow
-		counter1 = 0
-	END IF
-END SUBROUTINE SUB_UVDCPROT
