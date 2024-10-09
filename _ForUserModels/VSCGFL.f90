@@ -109,6 +109,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	USE MOD_TFBLOCKS 								! use module of generic transfer functions
 	USE MOD_PROTECTION								! use module of protection functions
 	USE MOD_READHYADCSIM							! use module for reading the HYACDCSIM text files
+	USE MOD_MISC									! use module for miscellaneous functions
 	USE MOD_VSCGFL_INTERNAL							! use module for global VSCGFL-related variables
 	INCLUDE 'COMON4.INS'							! common PSS/e variables and modules
 	IMPLICIT NONE
@@ -361,7 +362,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			! ==============	  
 			
 			! Get initial value of the DC voltage state from .txt files
-			! CALL SUB_READFROMFILESVSCON(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
 			CALL SUB_READDCBUS(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
 			
 			! Get STATE index position of the dc grid model DCGRID (governor-type model)	  
@@ -536,8 +536,11 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		END IF
 		
 		! limit current references and set anti-wind up indicators
-		CALL SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)		
-		
+		! CALL SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)		
+		CALL SUB_IMAXLIMITSIREF(icdref, icqref, antiwindupicd, antiwindupicq, ILIMITPRIORITY, icmax)
+		CALL SUB_ECMAXLIMITSIREF(icdref, icqref, us, udc, FMODULATIONPWMMAX, zc)
+
+
 		! DC protection
 		CALL SUB_OVDCPROT(istripvsc, counter_ovdc, tinitial_ovdc, udc, TIME, UDC_MAX, TUDCMAX, NUMBUS(IB),'VSCGFL',LPDEV)
 		CALL SUB_UVDCPROT(istripvsc, counter_uvdc, tinitial_uvdc, udc, TIME, UDC_MIN, TUDCMIN, NUMBUS(IB),'VSCGFL',LPDEV)
@@ -667,75 +670,3 @@ END SUBROUTINE VSCGFL
 ! ======================================================================================
 
 
-SUBROUTINE SUB_COMPUTEPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)
-	
-	REAL, INTENT(OUT) :: ploss
-	REAL, INTENT(IN) :: ps, ic, aloss, bloss, c_inv, c_rect
-
-	IF (ps.GE.0.0) THEN 
-		ploss = aloss + bloss*ic + c_inv*ic**2  ! inverter
-	ELSE 
-		ploss = aloss + bloss*ic + c_rect*ic**2 ! rectifier
-	END IF
-
-END SUBROUTINE SUB_COMPUTEPLOSS
-    
-SUBROUTINE SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)
-
-	INTEGER, INTENT(IN) :: ILIMITPRIORITY
-	REAL, INTENT(IN) :: us, udc, icmax, FMODULATIONPWMMAX
-	COMPLEX, INTENT(IN) :: zc
-	
-	REAL, INTENT(INOUT) :: icdref, icqref, antiwindupicd, antiwindupicq
-
-	REAL :: icref, ecmax, ecref, deltacref
-	COMPLEX :: icref_phasor_dq, ecref_phasor_dq, us_phasor_dq
-	
-
-	! Check current limits (icref <= icmax)
-	icref = SQRT(icdref**2 + icqref**2)
-	IF (icref.GT.icmax) THEN
-		IF (ILIMITPRIORITY.EQ.1) THEN 								! P-priority		  
-			antiwindupicq = 0.0 											! icq will be always on the limit in this case
-			IF (ABS(icdref).GT.icmax) THEN
-				antiwindupicd = 0.0 										! icd is on the limit
-			ELSE
-				antiwindupicd = 1.0 										
-			END IF
-			icdref = MIN(ABS(icdref), icmax)*SIGN(1.0,icdref) 		
-			icqref = SQRT(icmax**2 - icdref**2)*SIGN(1.0,icqref)		  
-		ELSE IF (ILIMITPRIORITY.EQ.2) THEN 							! Q-priority
-			antiwindupicd = 0.0 											! icq will be always on the limit in this case
-			IF (ABS(icqref).GT.icmax) THEN
-				antiwindupicq = 0.0 										! icq is on the limit
-			ELSE
-				antiwindupicq = 1.0 										
-			END IF
-			icqref = MIN(ABS(icqref), icmax)*SIGN(1.0,icqref) 		! change the current reference: icqref = icq_ref_aux
-			icdref = SQRT(icmax**2 - icqref**2)*SIGN(1.0,icdref)		  
-		ELSE 														! P-Q equal priority 
-			antiwindupicd = 0.0
-			antiwindupicq = 0.0
-			icdref = icmax*icdref/icref
-			icqref = icmax*icqref/icref	  
-		END IF  
-	ELSE
-		antiwindupicd = 1.0
-		antiwindupicq = 1.0
-	END IF
-
-	! Check maximum modulation index (ec <= FMODULATIONPWMMAX*udc)
-	ecmax = FMODULATIONPWMMAX*udc
-	us_phasor_dq = CMPLX(us, 0.0)
-	icref_phasor_dq = CMPLX(icdref, icqref) 
-	ecref_phasor_dq = us_phasor_dq + zc*icref_phasor_dq
-	ecref = ABS(ecref_phasor_dq)
-	deltacref = ATAN2(AIMAG(ecref_phasor_dq), REAL(ecref_phasor_dq))
-	IF (ecref.GT.ecmax) THEN	  
-		ecref_phasor_dq = CMPLX(ecmax*cos(deltacref), ecmax*sin(deltacref)) 	  
-		icref_phasor_dq = (ecref_phasor_dq - us_phasor_dq)/zc
-		icdref = REAL(icref_phasor_dq)
-		icqref = AIMAG(icref_phasor_dq) 
-	END IF
-	
-END SUBROUTINE SUB_LIMITIREF

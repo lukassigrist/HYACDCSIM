@@ -141,6 +141,10 @@ SUBROUTINE SVSCON(I_MACH,I_SLOT)
 	!DEC$ ATTRIBUTES REFERENCE :: I_MACH,I_SLOT
 
 	INCLUDE 'COMON4.INS'
+	USE MOD_READHYADCSIM
+	USE MOD_MISC
+	USE MOD_PROTECTION
+
 	IMPLICIT none
 	
 	! Declaration
@@ -383,7 +387,8 @@ SUBROUTINE SVSCON(I_MACH,I_SLOT)
 			! ==============	  
 			
 			! get initial value of the DC voltage state from .txt files
-			CALL SUB_READFROMFILESVSCON(Udc_ini_vector, CONVERTER_ACDC_BUS, IDGRID, NDCBUS)
+			CALL SUB_READDCBUS(Udc_ini_vector, CONVERTER_ACDC_BUS, IDGRID, NDCBUS)
+			! CALL SUB_READFROMFILESVSCON(Udc_ini_vector, CONVERTER_ACDC_BUS, IDGRID, NDCBUS)
 			
 			! get STATE of dc grid model DCGRID (governor-type model)	  
 			CALL MDLIND(CONVERTER_ACDC_BUS(1,2), MACHID(I_MACH), 'GOV', 'STATE', I_STATE_DCGRID, IERR)
@@ -437,7 +442,8 @@ SUBROUTINE SVSCON(I_MACH,I_SLOT)
 			! DC-side voltage, current, power
 			udc = Udc_ini_vector(IDXCONVERTER,1) ! extract initial dc voltage value
 			udc_ini = udc
-			CALL SUB_GETPLOSS(ploss, ps_initial, ic_abs, aloss, bloss, c_inv, c_rect)
+			! CALL SUB_GETPLOSS(ploss, ps_initial, ic_abs, aloss, bloss, c_inv, c_rect)
+			CALL SUB_COMPUTEPLOSS(ploss, ps_initial, ic_abs, aloss, bloss, c_inv, c_rect)
 			pdc = -(pvsc+ploss)
 			idc_ini = pdc/udc_ini
 			idc = idc_ini
@@ -566,11 +572,13 @@ SUBROUTINE SVSCON(I_MACH,I_SLOT)
 		
 		! limit current references and set anti-wind up indicators
 		m_modulation = ec/MAX(udc,0.0001)
-		CALL SUB_LIMITIREF(icd_ref, icq_ref, aux_ilimit, awu_d, awu_q, us_phasor, udc, ILIMITPRIORITY, ic_max, m_MODULATION_MAX, zc)		
-		
+		! CALL SUB_LIMITIREF(icd_ref, icq_ref, aux_ilimit, awu_d, awu_q, us_phasor, udc, ILIMITPRIORITY, ic_max, m_MODULATION_MAX, zc)		
+		CALL SUB_IMAXLIMITSIREF(icd_ref, icq_ref, awu_d, awu_q, ILIMITPRIORITY, ic_max)
+		CALL SUB_ECMAXLIMITSIREF(icd_ref, icq_ref, us, udc, m_MODULATION_MAX, zc)
+
 		! DC protection
-		CALL SUB_OVDCPROT(issimstop, udc, TIME, tinitial_ovdc, counter_ovdc, UDC_MAX, TUDCMAX)
-		CALL SUB_UVDCPROT(issimstop, udc, TIME, tinitial_uvdc, counter_uvdc, UDC_MIN, TUDCMIN)
+		CALL SUB_OVDCPROT(issimstop, counter_ovdc, tinitial_ovdc, udc, TIME, UDC_MAX, TUDCMAX, NUMBUS(IB),'SVSCON',LPDEV)
+		CALL SUB_UVDCPROT(issimstop, counter_uvdc, tinitial_uvdc, udc, TIME, UDC_MIN, TUDCMIN, NUMBUS(IB),'SVSCON',LPDEV)
 		
 		icd = 0.0
 		icq = 0.0
@@ -594,7 +602,8 @@ SUBROUTINE SVSCON(I_MACH,I_SLOT)
 		qvsc = AIMAG(sc_phasor)
 
 		! DC-side converter current current and power
-		CALL SUB_GETPLOSS(ploss, ps, ic_abs, aloss, bloss, c_inv, c_rect)	
+		! CALL SUB_GETPLOSS(ploss, ps, ic_abs, aloss, bloss, c_inv, c_rect)	
+		CALL SUB_COMPUTEPLOSS(ploss, ps, ic_abs, aloss, bloss, c_inv, c_rect)
 		pdc = -(pvsc+ploss) ! the same... only necessary one of them output of the converter model; input of the DC-grid model
 		idc = pdc/udc ! output of the converter model; input of the DC-grid model
 		
@@ -626,7 +635,7 @@ SUBROUTINE SVSCON(I_MACH,I_SLOT)
 
 	! RE-ASSIGN VARIABLES
 	! -------------------	  
-	icd = xd ! sólo era para identificar mejor los estados
+	icd = xd ! sï¿½lo era para identificar mejor los estados
 	icq = xq
 
 	! VARs	  
@@ -862,52 +871,4 @@ SUBROUTINE SUB_LIMITIREF(icd_ref, icq_ref, aux_ilimit, awu_d, awu_q, us_phasor, 
 	icd_ref = icd_ref_p
 	icq_ref = icq_ref_p
 	
-END
-
-SUBROUTINE SUB_OVDCPROT(issimstop, udc, timenow, tinitial1, counter1, UDC_MAX, TUDCMAX)
-
-	IMPLICIT NONE
-	INTEGER :: issimstop, counter1
-	REAL :: udc, timenow, tinitial1
-	REAL :: UDC_MAX, TUDCMAX
-	
-	IF (udc.GT.UDC_MAX) THEN 
-
-		IF (counter1 .EQ. 0.0) THEN
-			tinitial1 = timenow
-			counter1 = 1
-		END IF  
-
-		IF ((timenow - tinitial1).GT.TUDCMAX) THEN
-			issimstop = 1
-		END IF 
-	
-	ELSE
-		tinitial1 = timenow
-		counter1 = 0
-	END IF
-END
-
-SUBROUTINE SUB_UVDCPROT(issimstop, udc, timenow, tinitial1, counter1, UDC_MIN, TUDCMIN)
-
-	IMPLICIT NONE
-	INTEGER :: issimstop, counter1
-	REAL :: udc, timenow, tinitial1
-	REAL :: UDC_MIN, TUDCMIN
-	
-	IF (udc.LT.UDC_MIN) THEN 
-
-		IF (counter1 .EQ. 0.0) THEN
-			tinitial1 = timenow
-			counter1 = 1
-		END IF  
-
-		IF ((timenow - tinitial1).GT.TUDCMIN) THEN
-			issimstop = 1
-		END IF 
-	
-	ELSE
-		tinitial1 = timenow
-		counter1 = 0
-	END IF
 END
