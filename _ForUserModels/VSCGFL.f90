@@ -536,10 +536,8 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		END IF
 		
 		! limit current references and set anti-wind up indicators
-		! CALL SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)		
 		CALL SUB_IMAXLIMITSIREF(icdref, icqref, antiwindupicd, antiwindupicq, ILIMITPRIORITY, icmax)
 		CALL SUB_ECMAXLIMITSIREF(icdref, icqref, us, udc, FMODULATIONPWMMAX, zc)
-
 
 		! DC protection
 		CALL SUB_OVDCPROT(istripvsc, counter_ovdc, tinitial_ovdc, udc, TIME, UDC_MAX, TUDCMAX, NUMBUS(IB),'VSCGFL',LPDEV)
