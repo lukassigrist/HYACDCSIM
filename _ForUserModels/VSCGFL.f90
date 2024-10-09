@@ -108,6 +108,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 
 	USE MOD_TFBLOCKS 								! use module of generic transfer functions
 	USE MOD_PROTECTION								! use module of protection functions
+	USE MOD_READHYADCSIM							! use module for reading the HYACDCSIM text files
 	USE MOD_VSCGFL_INTERNAL							! use module for global VSCGFL-related variables
 	INCLUDE 'COMON4.INS'							! common PSS/e variables and modules
 	IMPLICIT NONE
@@ -360,7 +361,8 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			! ==============	  
 			
 			! Get initial value of the DC voltage state from .txt files
-			CALL SUB_READFROMFILESVSCON(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
+			! CALL SUB_READFROMFILESVSCON(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
+			CALL SUB_READDCBUS(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
 			
 			! Get STATE index position of the dc grid model DCGRID (governor-type model)	  
 			CALL MDLIND(m_VSCACDCBUS(1,2), MACHID(I_MACH), 'GOV', 'STATE', I_STATE_DCGRID, ierr)
@@ -392,7 +394,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			pvsc = ps0 + REAL(zc)*(ic**2) 
 
 			! DC-side voltage, current, power
-			CALL SUB_GETPLOSS(ploss, ps0, ic, aloss, bloss, c_inv, c_rect)
+			CALL SUB_COMPUTEPLOSS(ploss, ps0, ic, aloss, bloss, c_inv, c_rect)
 			pdc = -(pvsc + ploss)
 			udc = v_udc0(IDXCONVERTER,1) ! extract initial dc voltage value
 			udc0 = udc
@@ -527,7 +529,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		! Reactive power related control	
 		IF(QCNTRLTYPE.EQ.2) THEN
 			CALL SUB_PI(ynq,nq,d_nq,(usref-us),3,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control
-			icqref = -MAX(MIN(-us*(icq0 - ynq),qsmin),qsmax)/us
+			icqref = -MIN(MAX(-us*(icq0 - ynq),qsmin),qsmax)/us
 		ELSE 													
 			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),3,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
 			icqref = -qsref/us - ymq
@@ -561,7 +563,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		fmodulationpwm = ec/MAX(udc,0.0001)
 
 		! DC-side converter current current and power
-		CALL SUB_GETPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)	
+		CALL SUB_COMPUTEPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)	
 		pdc = -(pvsc + ploss) 
 		idc = pdc/udc ! output of the converter model; input of the DC-grid model
 		
@@ -664,35 +666,8 @@ END SUBROUTINE VSCGFL
 ! OTHER SUBROUTINES
 ! ======================================================================================
 
-SUBROUTINE SUB_READFROMFILESVSCON(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
-	
-	CHARACTER(1) :: IDGRID, line_header 
-	INTEGER :: NDCBUS, m_VSCACDCBUS(NDCBUS,1), ivsc ! ac and dc buses of each converter
-	REAL :: v_udc0(NDCBUS,1)
-	
-	OPEN(UNIT=20, FILE='.\data_acdcbus.txt') ! .txt files where .dll is located
-	OPEN(UNIT=21, FILE='.\data_Udc_ini.txt')
 
-	line_header = "+"
-	DO WHILE (line_header.NE.IDGRID) ! read until header according to grid identifier IDGRID
-		READ(20, *) line_header
-	END DO
-
-	line_header = "+"
-	DO WHILE (line_header.NE.IDGRID) ! read until header according to grid identifier IDGRID
-		READ(21, *) line_header
-	END DO
-
-	DO ivsc=1,NDCBUS
-		READ(20,*)m_VSCACDCBUS(ivsc,1),m_VSCACDCBUS(ivsc,2)
-		READ(21,*)v_udc0(ivsc,1)
-	END DO
-	CLOSE(20)
-	CLOSE(21)
-
-END SUBROUTINE SUB_READFROMFILESVSCON
-
-SUBROUTINE SUB_GETPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)
+SUBROUTINE SUB_COMPUTEPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)
 	
 	REAL, INTENT(OUT) :: ploss
 	REAL, INTENT(IN) :: ps, ic, aloss, bloss, c_inv, c_rect
@@ -703,7 +678,7 @@ SUBROUTINE SUB_GETPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)
 		ploss = aloss + bloss*ic + c_rect*ic**2 ! rectifier
 	END IF
 
-END SUBROUTINE SUB_GETPLOSS
+END SUBROUTINE SUB_COMPUTEPLOSS
     
 SUBROUTINE SUB_LIMITIREF(icdref, icqref, antiwindupicd, antiwindupicq, us, udc, ILIMITPRIORITY, icmax, FMODULATIONPWMMAX, zc)
 

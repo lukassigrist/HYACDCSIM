@@ -30,6 +30,7 @@ SUBROUTINE DCGRID(I_MACH,I_SLOT)
 
 	! for the global variables (matrices)
 	USE module_globalmatrices
+	USE MOD_READHYADCSIM
 	INCLUDE 'COMON4.INS'
 	IMPLICIT none
 
@@ -161,7 +162,9 @@ SUBROUTINE DCGRID(I_MACH,I_SLOT)
 		END IF
 	  
 		! Read DC-grid data from .txt file
-		CALL SUB_READFROMFILEDCGRID(I_VAR_SVSCON, Udc_ini, Ydc, Ac, Gdc, Cdc_inv, Rsdc, Rsdc_inv, Ldc_inv, I_MACH, CONVERTER_ACDC_BUS, IDGRID, NDCBUS, NDCLINES)	
+		! CALL SUB_READFROMFILEDCGRID(I_VAR_SVSCON, Udc_ini, Ydc, Ac, Gdc, Cdc_inv, Rsdc, Rsdc_inv, Ldc_inv, I_MACH, CONVERTER_ACDC_BUS, IDGRID, NDCBUS, NDCLINES)	
+		CALL SUB_READDCGRID(I_VAR_SVSCON, Udc_ini, Ydc, Ac, Gdc, Cdc_inv, Rsdc, Rsdc_inv, Ldc_inv, I_MACH, CONVERTER_ACDC_BUS, IDGRID, NDCBUS, NDCLINES)	
+
 
 		Ac_T = TRANSPOSE(Ac)
 
@@ -432,7 +435,7 @@ SUBROUTINE SUB_READFROMFILEDCGRID(I_VAR_SVSCON, Udc_ini, Ydc, Ac, Gdc, Cdc_inv, 
 	OPEN(UNIT=20, FILE='.\data_acdcbus.txt')
 
 
-	! Salta las líneas hasta encontrar la letra de su RED [header]
+	! Salta las lï¿½neas hasta encontrar la letra de su RED [header]
 	line_header = "+"
 	DO WHILE (line_header.NE.IDGRID)
 		READ(10, *) line_header
