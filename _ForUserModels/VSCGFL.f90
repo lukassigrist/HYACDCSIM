@@ -1,18 +1,28 @@
-! Dynamic model of a VSC converter of a VSC-based MTDC grid
+! Dynamic model of a grid-following VSC of a VSC-based MTDC grid
 ! 
-! The VSC converter computes the currents injected into the ac grid and the currents injected into the DC grid. The DC grid
-! model, implemented as a governor type model, takes as input the DC current injected by VSC.
+! The VSC converter computes the currents injected into the ac grid and the power injected into the DC grid. The DC grid
+! model, implemented as a governor type model, uses the power injected into the DC grid as an input.
 !
-! The VSC converter model is based on a grid-following converter. The current control of the converter is simplified
-! and reduced to a first-order transfer function. 
+! The VSC converter model is based on a grid-following converter. The current dynamics are represented by a first-order system. 
+! The control is formulated in a dq reference system aligned with the terminal voltage. No PLL is used so far. The current 
+! references are computed from active and reactive power references.  
 ! 
-! Supervisory controls such as active and reactive power controls, DC-voltage control, etc. are implemented in further
-! user models. These user models are implemented as stabilizer (SQWDRD), excitation (SPWDRD), and governor type models 
-! (DCGRID). Note that the calling sequence for the plant models is: 1. Generator models, 2. Current compensating models, 
+! us,dq = us,RI*exp(-j*deltas) = us + j*0.0
+! icref,dq = (ssref/us,dq)* = psref/us - j*qsref/us
+! ic,dq = [1/(1+s*Td) 0; 0 1/(1+s*Tq)]*icref,dq 
+!
+! Supervisory controls such as active and reactive power controls, DC-voltage control, etc., essentially modify the active and 
+! reactive power references. These supervisory controls are implemented by means of different user models:
+!
+! - stabilizer (SQWDRD), modifying the reactive power reference,
+! - excitation (SPWDRD), modifying the active power reference, and 
+! - governor (DCGRID), modeling the DC grid dynamics.
+!
+! Note that the calling sequence for the plant models is: 1. Generator models, 2. Current compensating models, 
 ! 3. Excitation stabilizer models, 4. Excitation system models, 5. Turbine-governor models. Turbine governor, stabilizer
 ! and excitation limiter models have no initialization duties other than STATEs and VARs.
 ! 
-! The VSC converter model, VSCGFL, is implemented as a coordinated-call, current injecting generator model (IC = 1 
+! The grid-following VSC model, VSCGFL, is implemented as a coordinated-call, current injecting generator model (IC = 1 
 ! and IT = 1). Coordinated-call implementation is required to cancel the effect of the admittance of the Norton
 ! equivalent applied to generators, which leads to a pure current source.  
 
@@ -138,16 +148,10 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	REAL icD_out, icQ_out ! Currents in DQ.
 	REAL ps, qs
 
-	REAL xd, xq 		! state variables: icd and icq
-	REAL md, mq 		! state variables: integrals for active and reactive power control
-	REAL ndc, nq 		! state variables: integrals for dc and ac voltage controls
-	REAL eta_d 			! state variables: integrals angle control
-	REAL d_xd, d_xq 	
-	REAL d_md, d_mq 	
-	REAL d_ndc, d_nq 	
-	REAL d_eta_d 
+	REAL xd, xq, md, mq, ndc, nq, eta_d 				! state variables
+	REAL d_xd, d_xq, d_md, d_mq, d_ndc, d_nq, d_eta_d 	! derivatives of state variables 	
 
-	REAL aux_ilimit, antiwindupicd, antiwindupicq        
+	REAL antiwindupicd, antiwindupicq        
 
 	REAL ic, ic_abs_puconv ! Current magnitude
 
@@ -172,17 +176,15 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 
 	REAL TAU	
 	REAL KD_Pps, KD_Pudc, KD_Ips, KD_Iudc, KD_D2, KQ_Pqs, KQ_Iqs, KQ_Pus, KQ_Ius
-	REAL ICMAX_PUconv
-	REAL PS_MAX_MW, PS_MIN_MW, QS_MAX_Mvar, QS_MIN_Mvar
+	REAL ICMAX
+	REAL PSMAX, PSMIN, QSMAX, QSMIN
 	REAL ALOSS_MW, BLOSS_kV, CLOSS_RECT_Ohm, CLOSS_INV_Ohm
 	REAL UDC_MAX, UDC_MIN, TUDCMAX, TUDCMIN
 
-	REAL icmax
-	REAL psmax, psmin, qsmax, qsmin
+	REAL icmaxpu
+	REAL psmaxpu, psminpu, qsmaxpu, qsminpu
 	REAL aloss, bloss, c_rect, c_inv
-	REAL CDC_uF, Cdc
-	REAL UDC_NOMINAL_kV
-	REAL ZBASE, ZDCBASE, SDCBASE_MVA
+	REAL ZBASE
 	COMPLEX zc
 	REAL ploss
 	
@@ -206,22 +208,21 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	I_VAR = STRTIN(3,I_SLOT)
 	I_ICON = STRTIN(4,I_SLOT)
 		
-	! CONs    
+	! CONs (if in pu, in pu of converter rating)   
 	TAU = CON(I_CON) 		! Inverter time constant (e.g., 0.1)
 	KD_Pps = CON(I_CON+1) 	! Ps control
 	KD_Ips = CON(I_CON+2)
 	KD_Pudc = CON(I_CON+3) 	! Udc control 
 	KD_Iudc = CON(I_CON+4)
-	KD_D2 = CON(I_CON+5) ! gain of the differential control of Udc -> for the DC-voltage control, PID works much better than PI
 	KQ_Pqs = CON(I_CON+6) 	! Qs control
 	KQ_Iqs = CON(I_CON+7)
 	KQ_Pus = CON(I_CON+8) 	! Us control
 	KQ_Ius = CON(I_CON+9)
-	ICMAX_PUconv = CON(I_CON+10) ! Maximum inverter current/susceptance in pu with respect to inverter rating (e.g., 1.1)
-	PS_MAX_MW = CON(I_CON+11)
-	PS_MIN_MW = CON(I_CON+12)
-	QS_MAX_Mvar = CON(I_CON+13)
-	QS_MIN_Mvar = CON(I_CON+14)
+	ICMAX = CON(I_CON+10) 	! Maximum inverter current (e.g., 1.1)
+	PSMAX = CON(I_CON+11)
+	PSMIN = CON(I_CON+12)
+	QSMAX = CON(I_CON+13)
+	QSMIN = CON(I_CON+14)
 	UDC_MAX = CON(I_CON+15)
 	UDC_MIN = CON(I_CON+16)
 	FMODULATIONPWMMAX = CON(I_CON+17)
@@ -229,8 +230,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	BLOSS_kV = CON(I_CON+19) 		! linear converter loss coefficient (kV): ploss = aloss + bloss*ic + c*ic^2
 	CLOSS_RECT_Ohm = CON(I_CON+20) 	! rectifier quadratic converter loss coefficient (ohm): ploss = aloss + bloss*ic + c*ic^2
 	CLOSS_INV_Ohm = CON(I_CON+21) 	! constant converter loss coefficient (ohm): ploss = aloss + bloss*ic + c*ic^2
-	CDC_uF = CON(I_CON+22) 			! capacitor of the converter (micro-Faraday) (uF)
-	UDC_NOMINAL_kV = CON(I_CON+23) 	! nominal dc-voltage of the converter (kV)
 	TUDCMIN = CON(I_CON+24) 		! DC undervoltage protection delay
 	TUDCMAX = CON(I_CON+25) 		! DC overvoltage protection delay
 
@@ -264,7 +263,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	udcref = VAR(I_VAR+13)
 
 	usref = VAR(I_VAR+15)
-	aux_ilimit = VAR(I_VAR+16)
 	antiwindupicd = VAR(I_VAR+17)
 	antiwindupicq = VAR(I_VAR+18)
 	ic_abs_puconv = VAR(I_VAR+19)
@@ -310,22 +308,20 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	ALLOCATE(v_udc0(NDCBUS,1)) ! allocate size
 	ALLOCATE(m_VSCACDCBUS(NDCBUS,2))
 
-	icmax = ICMAX_PUconv*MBASE(I_MACH)/SBASE ! current limit in system base
-	psmax = PS_MAX_MW/SBASE               ! power limits in system base
-	psmin = PS_MIN_MW/SBASE
-	qsmax = QS_MAX_Mvar/SBASE
-	qsmin = QS_MIN_Mvar/SBASE
+	icmaxpu = ICMAX*MBASE(I_MACH)/SBASE 	! current limit in system base
+	psmaxpu = PSMAX/SBASE               	! power limits in system base
+	psminpu = PSMIN/SBASE
+	qsmaxpu = QSMAX/SBASE
+	qsminpu = QSMIN/SBASE
 
-	ZBASE = BASVLT(IB)**2/SBASE               ! AC-side Zbase in ohms
-	SDCBASE_MVA = SBASE
-	ZDCBASE = 2*UDC_NOMINAL_kV**2/SDCBASE_MVA ! DC-side Zbase in ohms
+	ZBASE = BASVLT(IB)**2/SBASE             ! AC-side Zbase in ohms
 
 	aloss = ALOSS_MW/SBASE                  ! losses coefs in system base
 	bloss = BLOSS_kV/SQRT(3.0)/BASVLT(IB)
 	c_rect = CLOSS_RECT_Ohm/ZBASE
 	c_inv = CLOSS_INV_Ohm/ZBASE
-	zc = ZSORCE(I_MACH)*SBASE/MBASE(I_MACH)       ! conexion impedance in system base
-	Cdc = (CDC_uF*1e-6)*ZDCBASE             ! [pu*s]
+
+	zc = ZSORCE(I_MACH)*SBASE/MBASE(I_MACH)  ! conexion impedance in system base
 
 	I_STATE_DCGRID = I_STATE_DCGRID_G
 	
@@ -351,8 +347,8 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	icq = AIMAG(ic_phasor_RI/reference_transf) 
 
 	! present power and current references
-	psref = MIN(MAX(ps0 + deltapsref,psmin),psmax)
-	qsref = MIN(MAX(qs0 + deltaqsref,qsmin),qsmax)
+	psref = MIN(MAX(ps0 + deltapsref,psminpu),psmaxpu)
+	qsref = MIN(MAX(qs0 + deltaqsref,qsminpu),qsmaxpu)
 
 	SELECT CASE (MODE)
 
@@ -383,8 +379,8 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			
 			! AC-side converter current out of range       
 			ic = SQRT(icd**2+icq**2) 
-			IF (ic.GT.icmax) THEN
-				WRITE (LPDEV,*) 'VSCGFL::CASE1: Current exceeds limit of ',icmax,' pu.'
+			IF (ic.GT.icmaxpu) THEN
+				WRITE (LPDEV,*) 'VSCGFL - CASE 1: Current exceeds limit of ',icmaxpu,' pu.'
 			END IF
 			
 			! AC-side converter voltages, power
@@ -403,7 +399,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		
 			fmodulationpwm = ec/MAX(udc0,0.0001)
 			IF (fmodulationpwm.GT.FMODULATIONPWMMAX) THEN
-				WRITE (LPDEV,*) 'VSCGFL::CASE1: Modulation index exceeds limit of ',FMODULATIONPWMMAX,'.'
+				WRITE (LPDEV,*) 'VSCGFL - CASE 1: Modulation index exceeds limit of ',FMODULATIONPWMMAX,'.'
 			END IF
 
 			! references
@@ -426,8 +422,8 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			! Current control
 			d_xd = 0.0
 			d_xq = 0.0
-			CALL SUB_FIRSTORDERWINDUP(icdref,xd,d_xd,icdref,1,-1,DELTAT,TAU,icmax,-icmax) 				! icd
-			CALL SUB_FIRSTORDERWINDUP(icqref,xq,d_xq,icqref,1,-1,DELTAT,TAU,icmax,-icmax) 				! icq
+			CALL SUB_FIRSTORDERWINDUP(icdref,xd,d_xd,icdref,1,-1,DELTAT,TAU,icmaxpu,-icmaxpu) 				! icd
+			CALL SUB_FIRSTORDERWINDUP(icqref,xq,d_xq,icqref,1,-1,DELTAT,TAU,icmaxpu,-icmaxpu) 				! icq
 
 			! Active power related control	
 			d_eta_d = 0.0
@@ -436,17 +432,17 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			yetad = 0.0
 			yndc = 0.0
 			ymd = 0.0
-			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),2,DELTAT,100.0,1000.0,icmax,-icmax)			! Deltas control					
-			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),2,DELTAT,KD_Pudc,KD_Iudc,icmax,-icmax)				! DC-voltage control													
-			CALL SUB_PI(ymd,md,d_md,(psref-ps),2,DELTAT,KD_Pps,KD_Ips,icmax,-icmax)						! Ps control
+			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),2,DELTAT,100.0,1000.0,icmaxpu,-icmaxpu)			! Deltas control					
+			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),2,DELTAT,KD_Pudc,KD_Iudc,icmaxpu,-icmaxpu)				! DC-voltage control													
+			CALL SUB_PI(ymd,md,d_md,(psref-ps),2,DELTAT,KD_Pps,KD_Ips,icmaxpu,-icmaxpu)						! Ps control
 
 			! Reactive power related control	
 			d_nq = 0.0
 			d_mq = 0.0
 			ynq = 0.0
 			ymq = 0.0
-			CALL SUB_PI(ynq,nq,d_nq,(usref-us),2,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control													
-			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),2,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
+			CALL SUB_PI(ynq,nq,d_nq,(usref-us),2,DELTAT,KQ_Pus,KQ_Ius,icmaxpu,-icmaxpu)						! Us control													
+			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),2,DELTAT,KQ_Pqs,KQ_Iqs,icmaxpu,-icmaxpu)						! Qs control
 
 			PMECH(I_MACH) = -pdc				! pu system rating
 			SPEED(I_MACH) = BSFREQ(IB)            		
@@ -456,12 +452,12 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			
 			WRITE (LPDEV,*) 'VSCGFL - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized.'
 			WRITE (LPDEV,*) 'VSCGFL - CASE 1: D-control: ',DCNTRLTYPE,' Q-control: ',QCNTRLTYPE,' I-limit priority: ',ILIMITPRIORITY
-			WRITE (LPDEV,*) 'VSCGFL - CASE 1: us = ',us,' pu, ec = ',ec,' pu'
-			WRITE (LPDEV,*) 'VSCGFL - CASE 1: ps = ',ps0,' pu, qs = ', qs0, ' pu'
-			WRITE (LPDEV,*) 'VSCGFL - CASE 1: pc = ',pvsc,', pu ploss = ',ploss,' pu'
-			WRITE (LPDEV,*) 'VSCGFL - CASE 1: udc = ',udc,' pu, pdc = ',-pdc,' pu'
-			WRITE (LPDEV,*) 'VSCGFL - CASE 1: idc = ',idc, ' pu'
-			WRITE (LPDEV,*) 'VSCGFL - CASE 1: icd = ',icd,' pu, icq = ',icq, ' pu'
+			!WRITE (LPDEV,*) 'VSCGFL - CASE 1: us = ',us,' pu, ec = ',ec,' pu'
+			!WRITE (LPDEV,*) 'VSCGFL - CASE 1: ps = ',ps0,' pu, qs = ', qs0, ' pu'
+			!WRITE (LPDEV,*) 'VSCGFL - CASE 1: pc = ',pvsc,', pu ploss = ',ploss,' pu'
+			!WRITE (LPDEV,*) 'VSCGFL - CASE 1: udc = ',udc,' pu, pdc = ',-pdc,' pu'
+			!WRITE (LPDEV,*) 'VSCGFL - CASE 1: idc = ',idc, ' pu'
+			!WRITE (LPDEV,*) 'VSCGFL - CASE 1: icd = ',icd,' pu, icq = ',icq, ' pu'
 							
 	CASE (2) 
 	   
@@ -474,23 +470,23 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		END IF
 
 		! Current control
-		CALL SUB_FIRSTORDERWINDUP(icd,xd,d_xd,icdref,2,0,DELTAT,TAU,icmax,-icmax) 						! icd
-		CALL SUB_FIRSTORDERWINDUP(icq,xq,d_xq,icqref,2,0,DELTAT,TAU,icmax,-icmax) 						! icq
+		CALL SUB_FIRSTORDERWINDUP(icd,xd,d_xd,icdref,2,0,DELTAT,TAU,icmaxpu,-icmaxpu) 						! icd
+		CALL SUB_FIRSTORDERWINDUP(icq,xq,d_xq,icqref,2,0,DELTAT,TAU,icmaxpu,-icmaxpu) 						! icq
 
 		! Active power related control
 		IF(DCNTRLTYPE.EQ.3) THEN 							
-			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),2,DELTAT,100.0,1000.0,icmax,-icmax)		! Deltas control
+			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),2,DELTAT,100.0,1000.0,icmaxpu,-icmaxpu)		! Deltas control
 		ELSE IF(DCNTRLTYPE.EQ.2) THEN						
-			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),2,DELTAT,KD_Pudc,KD_Iudc,icmax,-icmax)				! DC-voltage control
+			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),2,DELTAT,KD_Pudc,KD_Iudc,icmaxpu,-icmaxpu)				! DC-voltage control
 		ELSE 													
-			CALL SUB_PI(ymd,md,d_md,(psref-ps),2,DELTAT,KD_Pps,KD_Ips,icmax,-icmax)						! Ps control
+			CALL SUB_PI(ymd,md,d_md,(psref-ps),2,DELTAT,KD_Pps,KD_Ips,icmaxpu,-icmaxpu)						! Ps control
 		END IF
 
 		! Reactive power related control	
 		IF(QCNTRLTYPE.EQ.2) THEN
-			CALL SUB_PI(ynq,nq,d_nq,(usref-us),2,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control
+			CALL SUB_PI(ynq,nq,d_nq,(usref-us),2,DELTAT,KQ_Pus,KQ_Ius,icmaxpu,-icmaxpu)						! Us control
 		ELSE 													
-			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),2,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
+			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),2,DELTAT,KQ_Pqs,KQ_Iqs,icmaxpu,-icmaxpu)						! Qs control
 		END IF
 
 		! Apply anti-wind up indicators of current control: if current reaches a limit, temporarily cancel corresponding active and reactive power control
@@ -511,32 +507,32 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		END IF
 
 		! Current control
-		CALL SUB_FIRSTORDERWINDUP(icd,xd,d_xd,icdref,3,0,DELTAT,TAU,icmax,-icmax) 						! icd
-		CALL SUB_FIRSTORDERWINDUP(icq,xq,d_xq,icqref,3,0,DELTAT,TAU,icmax,-icmax) 						! icq
+		CALL SUB_FIRSTORDERWINDUP(icd,xd,d_xd,icdref,3,0,DELTAT,TAU,icmaxpu,-icmaxpu) 						! icd
+		CALL SUB_FIRSTORDERWINDUP(icq,xq,d_xq,icqref,3,0,DELTAT,TAU,icmaxpu,-icmaxpu) 						! icq
 
 		! Active power related control
 		IF(DCNTRLTYPE.EQ.3) THEN 							
-			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),3,DELTAT,100.0,1000.0,icmax,-icmax)		! Deltas control
+			CALL SUB_PI(yetad,eta_d,d_eta_d,(deltas0-deltas),3,DELTAT,100.0,1000.0,icmaxpu,-icmaxpu)		! Deltas control
 			icdref = icd0 + yetad
 		ELSE IF(DCNTRLTYPE.EQ.2) THEN						
-			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),3,DELTAT,KD_Pudc,KD_Iudc,icmax,-icmax)				! DC-voltage control
+			CALL SUB_PI(yndc,ndc,d_ndc,(udcref-udc),3,DELTAT,KD_Pudc,KD_Iudc,icmaxpu,-icmaxpu)				! DC-voltage control
 			icdref = icd0 - yndc
 		ELSE 													
-			CALL SUB_PI(ymd,md,d_md,(psref-ps),3,DELTAT,KD_Pps,KD_Ips,icmax,-icmax)						! Ps control
+			CALL SUB_PI(ymd,md,d_md,(psref-ps),3,DELTAT,KD_Pps,KD_Ips,icmaxpu,-icmaxpu)						! Ps control
 			icdref = psref/us + ymd
 		END IF
 
 		! Reactive power related control	
 		IF(QCNTRLTYPE.EQ.2) THEN
-			CALL SUB_PI(ynq,nq,d_nq,(usref-us),3,DELTAT,KQ_Pus,KQ_Ius,icmax,-icmax)						! Us control
-			icqref = -MIN(MAX(-us*(icq0 - ynq),qsmin),qsmax)/us
+			CALL SUB_PI(ynq,nq,d_nq,(usref-us),3,DELTAT,KQ_Pus,KQ_Ius,icmaxpu,-icmaxpu)						! Us control
+			icqref = -MIN(MAX(-us*(icq0 - ynq),qsminpu),qsmaxpu)/us
 		ELSE 													
-			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),3,DELTAT,KQ_Pqs,KQ_Iqs,icmax,-icmax)						! Qs control
+			CALL SUB_PI(ymq,mq,d_mq,(qsref-qs),3,DELTAT,KQ_Pqs,KQ_Iqs,icmaxpu,-icmaxpu)						! Qs control
 			icqref = -qsref/us - ymq
 		END IF
 		
 		! limit current references and set anti-wind up indicators
-		CALL SUB_IMAXLIMITSIREF(icdref, icqref, antiwindupicd, antiwindupicq, ILIMITPRIORITY, icmax)
+		CALL SUB_IMAXLIMITSIREF(icdref, icqref, antiwindupicd, antiwindupicq, ILIMITPRIORITY, icmaxpu)
 		CALL SUB_ECMAXLIMITSIREF(icdref, icqref, us, udc, FMODULATIONPWMMAX, zc)
 
 		! DC protection
@@ -550,11 +546,11 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		
 		! AC-side converter current, voltage, power 
 		ps = us*icd 
-		qs = -us*icq ! qs = AIMAG(ss_vec)	
-		ic_phasor_RI = reference_transf*CMPLX(icd,icq) ! dq -> DQ, pu in system rating	
-		ec_phasor_RI = us_phasor_RI + zc*ic_phasor_RI ! converter voltage -> output		
-		sc_phasor = ec_phasor_RI*CONJG(ic_phasor_RI) ! interesa tenerlas, pero de momento no las usamos
-		ic = ABS(ic_phasor_RI) ! mag
+		qs = -us*icq 	
+		ic_phasor_RI = reference_transf*CMPLX(icd,icq) 	! dq -> DQ, pu in system rating	
+		ec_phasor_RI = us_phasor_RI + zc*ic_phasor_RI 	! converter voltage -> output		
+		sc_phasor = ec_phasor_RI*CONJG(ic_phasor_RI) 
+		ic = ABS(ic_phasor_RI)
 		icD_out = REAL(ic_phasor_RI) 
 		icQ_out = AIMAG(ic_phasor_RI)
 		ec = ABS(ec_phasor_RI)
@@ -584,10 +580,10 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	CASE (5)
 		! reporting mode
 		WRITE (LPDEV,*) 'Converter ', IDXCONVERTER, ' at bus ', NUMBUS(IB)
-		WRITE (LPDEV,*) 'SVSCON - ', 'CON', I_CON
-		WRITE (LPDEV,*) 'SVSCON - ', 'ICON', I_ICON
-		WRITE (LPDEV,*) 'SVSCON - ', 'VAR', I_VAR
-		WRITE (LPDEV,*) 'SVSCON - ', 'STATE', I_STATE
+		WRITE (LPDEV,*) 'VSCGFL - ', 'CON', I_CON
+		WRITE (LPDEV,*) 'VSCGFL - ', 'ICON', I_ICON
+		WRITE (LPDEV,*) 'VSCGFL - ', 'VAR', I_VAR
+		WRITE (LPDEV,*) 'VSCGFL - ', 'STATE', I_STATE
 			
 	CASE DEFAULT
 
@@ -620,7 +616,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	VAR(I_VAR+9) = icq
 
 	VAR(I_VAR+10) = istripvsc
-	VAR(I_VAR+16) = aux_ilimit
 	VAR(I_VAR+17) = antiwindupicd
 	VAR(I_VAR+18) = antiwindupicq
 	VAR(I_VAR+19) = ic_abs_puconv

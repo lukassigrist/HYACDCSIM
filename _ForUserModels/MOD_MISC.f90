@@ -89,4 +89,23 @@ CONTAINS
         
     END SUBROUTINE SUB_ECMAXLIMITSIREF
 
+    SUBROUTINE SUB_ZVILIMITSECREF(ec_phasor_dq, ic_phasor_dq, icmax, kpvi, sigmaxr)
+
+        
+        COMPLEX, INTENT(INOUT) :: ec_phasor_dq
+
+        COMPLEX, INTENT(IN) :: ic_phasor_dq
+        REAL, INTENT(IN) :: icmax, kpvi, sigmaxr
+
+        REAL :: ic, deltaic
+        COMPLEX :: zvi
+        
+        ic = abs(ic_phasor_dq)
+        deltaic = MAX(ic-icmax,0.0)
+        
+        zvi = deltaic*kpvi*CMPLX(1,sigmaxr)
+        ec_phasor_dq = ec_phasor_dq - zvi*ic_phasor_dq
+        
+    END SUBROUTINE SUB_ZVILIMITSECREF
+
 END MODULE MOD_MISC

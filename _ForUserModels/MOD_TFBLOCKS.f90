@@ -109,8 +109,8 @@ CONTAINS
 			
 			CASE (1)
 				
-				! x = u
-				CALL SUB_INTEGRATORWINDUP(y,x,dxdt,(u-x),1,T,YMAX,YMIN)
+				x = u
+				! CALL SUB_INTEGRATORWINDUP((u-y),x,dxdt,(u-x),1,T,YMAX,YMIN)
 			
 			CASE (2)
 				
