@@ -89,10 +89,10 @@ CONTAINS
         
     END SUBROUTINE SUB_ECMAXLIMITSIREF
 
-    SUBROUTINE SUB_ZVILIMITSECREF(ec_phasor_dq, ic_phasor_dq, icmax, kpvi, sigmaxr)
+    SUBROUTINE SUB_ZVILIMITSECREF(yecdviimax, yecqviimax, ic_phasor_dq, icmax, kpvi, sigmaxr)
 
         
-        COMPLEX, INTENT(INOUT) :: ec_phasor_dq
+        REAL, INTENT(OUT) :: yecdviimax, yecqviimax
 
         COMPLEX, INTENT(IN) :: ic_phasor_dq
         REAL, INTENT(IN) :: icmax, kpvi, sigmaxr
@@ -104,8 +104,40 @@ CONTAINS
         deltaic = MAX(ic-icmax,0.0)
         
         zvi = deltaic*kpvi*CMPLX(1,sigmaxr)
-        ec_phasor_dq = ec_phasor_dq - zvi*ic_phasor_dq
+        yecdviimax = REAL(zvi*ic_phasor_dq)
+        yecqviimax = AIMAG(zvi*ic_phasor_dq) 
         
     END SUBROUTINE SUB_ZVILIMITSECREF
+
+    SUBROUTINE SUB_ICMAXLIMITSECREF(ec_phasor_dq, ic_phasor_dq, us_phasor_dq, ILIMITPRIORITY, icmax, zc)
+
+        
+        COMPLEX, INTENT(OUT) :: ec_phasor_dq
+
+        COMPLEX, INTENT(IN) :: ic_phasor_dq, us_phasor_dq, zc
+        REAL, INTENT(IN) :: icmax
+        INTEGER, INTENT(IN) :: ILIMITPRIORITY
+
+        REAL :: ic, phic, icd, icq
+        
+        ic = MIN(abs(ic_phasor_dq),icmax)
+        phic = ATAN2(AIMAG(ic_phasor_dq), REAL(ic_phasor_dq))   ! P-Q equal priority 
+        icd = ic*cos(phic)
+        icq = ic*sin(phic)
+        IF (ILIMITPRIORITY.EQ.1) THEN                           ! P-priority
+            icd = ic*cos(phic)
+            icq = min(SQRT(icmax**2 - icd**2),abs(icq))*SIGN(1.0,icq)
+            phic = ATAN2(icq, icd)
+        ELSE IF (ILIMITPRIORITY.EQ.2) THEN                      ! Q-priority
+            icq = ic*sin(phic)
+            icd = min(SQRT(icmax**2 - icq**2),icd)*SIGN(1.0,icd)
+            phic = ATAN2(icq, icd)
+        ELSE                                                     ! Modify |ec| with deltac = const                     
+        END IF
+        
+                
+        ec_phasor_dq = us_phasor_dq + zc*ic*CMPLX(cos(phic), sin(phic))
+        
+    END SUBROUTINE SUB_ICMAXLIMITSECREF
 
 END MODULE MOD_MISC

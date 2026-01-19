@@ -23,12 +23,12 @@ str_dllfile = r"USRSOU.dll"
 str_pathfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\TestSystem" # Path
 
 # Solver parameters
-TSTEP = 0.001
+TSTEP = 0.002
 TYSLACCFAC = 0.8
 TYSLTOL = 0.0001
 TYSLMAXITER = 75
 TINI = 1
-TFINAL = 25
+TFINAL = 1
 
 # ------------
 # Preparations
@@ -51,7 +51,9 @@ print("Current Working Directory:", os.getcwd())
 # ----------
 if __name__ == "__main__":
     redirect.psse2py()
+   
     psspy.psseinit(2000)
+    psspy.progress_output(2,"report",[0,0])
 
     # Open file and run load flow
     psspy.case(str_pathlffile)
@@ -61,9 +63,9 @@ if __name__ == "__main__":
     # ----------------------------
     # Convert generator and loads
     psspy.cong(0)
-    psspy.conl(0,1,1,[0,0],[ 100.0,0.0,0.0, 100.0])
-    psspy.conl(0,1,2,[0,0],[ 100.0,0.0,0.0, 100.0])
-    psspy.conl(0,1,3,[0,0],[ 100.0,0.0,0.0, 100.0])
+    psspy.conl(0,1,1,[0,0],[ 100.0,00.0,0.0, 100.0])
+    psspy.conl(0,1,2,[0,0],[ 100.0,00.0,0.0, 100.0])
+    psspy.conl(0,1,3,[0,0],[ 100.0,00.0,0.0, 100.0])
 
     # Pre-run current-based load flow (TYSL, like SITER)
     psspy.ordr(0)
@@ -91,12 +93,19 @@ if __name__ == "__main__":
 
     # Add user-defined output channels (e.g., state variables of a user-defined model)
     ierr, I_STATE_VSC = psspy.mdlind(4,"""1""",'GEN','STATE')
+    ierr, I_VAR_VSC = psspy.mdlind(4,"""1""",'GEN','VAR')
     # ierr, I_STATE_VSC = psspy.mdlind(9,"""14""",'GEN','STATE') 
     # ierr, I_STATE_DCGRID = psspy.mdlind(7,"""14""",'GOV','STATE') 
-    psspy.state_channel([-1, I_STATE_VSC], r"xd")
-    psspy.state_channel([-1, I_STATE_VSC+1], r"xq")
+    psspy.state_channel([-1, I_STATE_VSC], r"xecd")
+    psspy.state_channel([-1, I_STATE_VSC+1], r"xecq")
+    psspy.state_channel([-1, I_STATE_VSC+2], r"delta")
+    psspy.state_channel([-1, I_STATE_VSC+3], r"omega")
     # psspy.state_channel([-1, I_STATE_DCGRID], r"udc1")
     # psspy.state_channel([-1, I_STATE_DCGRID+1], r"udc2")
+    psspy.var_channel([-1, I_VAR_VSC+13], r"id")
+    psspy.var_channel([-1, I_VAR_VSC+14], r"iq")
+    psspy.var_channel([-1, I_VAR_VSC+15], r"deltap")
+    psspy.var_channel([-1, I_VAR_VSC+16], r"pdc")
 
     # Add user-defined dynamic model
     psspy.addmodellibrary(str_pathdllfile)
@@ -120,13 +129,17 @@ if __name__ == "__main__":
     # --------
     # Get indices
     ierr,NMACHINES = psspy.amachcount(-1,1)
+    v_idxangle= range(0,NMACHINES)
     v_idxpelec= range(NMACHINES,2*NMACHINES)
+    v_idxqelec= range(2*NMACHINES,3*NMACHINES)
     v_idxeterm = range(3*NMACHINES,4*NMACHINES)
     v_idxefd = range(4*NMACHINES,5*NMACHINES)
     v_idxpmech = range(5*NMACHINES,6*NMACHINES)
     v_idxspeed = range(6*NMACHINES,7*NMACHINES)
-    v_idxvscstates = range(7*NMACHINES,7*NMACHINES+2) 
+    v_idxvscstates = range(7*NMACHINES+2,7*NMACHINES+4) 
     # v_idxdcgridstates = range(7*NMACHINES+2,7*NMACHINES+4) 
+    v_idxvscvarsi = range(7*NMACHINES+4,7*NMACHINES+6) 
+    v_idxvscvarsp = range(7*NMACHINES+7,7*NMACHINES+8) 
 
     fontP = FontProperties()
     fontP.set_size('small')
@@ -138,47 +151,100 @@ if __name__ == "__main__":
     # Extract time vector
     v_t = chandata['time']
     
-    # Figure with 3 subplots
+    # Figure with 3 subplots: PELEC and QELEC and ETERM
     fig, axs = plt.subplots(3,1)
-    l_legend1 = []
     for imach in v_idxpelec:
-        v_pe = chandata[imach+1]
-        axs[0].plot(v_t,v_pe,linewidth=2)
-        l_legend1.append(chanid.values()[imach+1]) 
+        axs[0].plot(v_t,chandata[imach+1],linewidth=2,label=chanid.values()[imach+1])
     axs[0].set_ylabel("Active power (pu)")
     axs[0].set_ylim(3,8)
-    
-    l_legend2 = []
+    axs[0].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+
+    for imach in v_idxqelec:
+        axs[1].plot(v_t,chandata[imach+1],linewidth=2,label=chanid.values()[imach+1])
+    axs[1].set_ylabel("Reactive power (pu)")
+    axs[1].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+
     for imach in v_idxeterm:
-        v_etm = chandata[imach+1]
-        axs[1].plot(v_t,v_etm,linewidth=2)
-        l_legend2.append(chanid.values()[imach+1]) 
-    axs[1].set_ylabel("Terminal voltage (pu)")
-    axs[1].set_ylim(0.96,1.04)
-
-    l_legend3 = []
-    # for imach in v_idxefd:
-        # v_efd = chandata[imach+1]
-        # axs[2].plot(v_t,v_efd,linewidth=2)
-        # l_legend3.append(chanid.values()[imach+1]) 
-    for imach in v_idxspeed:
-        v_speed = chandata[imach+1]
-        axs[2].plot(v_t,v_speed,linewidth=2)
-        l_legend3.append(chanid.values()[imach+1]) 
-    axs[2].set_ylabel("Speed (pu)")
-    axs[2].set_ylim(-0.005,0.005)
+        axs[2].plot(v_t,chandata[imach+1],linewidth=2,label=chanid.values()[imach+1])
+    axs[2].set_ylabel("Terminal voltage (pu)")
     axs[2].set_xlabel("Time (s)")
-
-    axs[0].legend(l_legend1,loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
-    axs[1].legend(l_legend2,loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
-    axs[2].legend(l_legend3,loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+    axs[2].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))   
     
     plt.subplots_adjust(wspace=0.5)
-    plt.savefig(os.path.join(str_pathfiles,"Machines.png"),bbox_inches="tight")
+    plt.savefig(os.path.join(str_pathfiles,"MachinesPQV.png"),bbox_inches="tight")
+    plt.show()
+    fig.clf()
+    plt.close(fig)
+
+    # Figure with 2 subplots: ANGLE and SPEED
+    fig, axs = plt.subplots(2,1)
+    for imach in v_idxspeed:
+        axs[0].plot(v_t,chandata[imach+1],linewidth=2,label=chanid.values()[imach+1])
+    axs[0].set_ylabel("Speed (pu)")
+    axs[0].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+
+
+    for imach in v_idxangle:
+        axs[1].plot(v_t,chandata[imach+1],linewidth=2,label=chanid.values()[imach+1])
+    axs[1].set_ylabel("Angle (pu)")
+    axs[1].set_xlabel("Time (s)")
+    axs[1].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+    
+    plt.subplots_adjust(wspace=0.5)
+    plt.savefig(os.path.join(str_pathfiles,"MachinesDW.png"),bbox_inches="tight")
     plt.show()
     fig.clf()
     plt.close(fig)
     
+
+    # Figure with two subplots: VSC states and currents
+    fig, axs = plt.subplots(3,1,sharex=True) 
+    '''for ix in v_idxvscstates:
+        v_x = chandata[ix+1]
+        axs[0].plot(v_t,v_x,linewidth=2)
+        l_legend1.append(chanid.values()[ix+1])'''
+    axs[0].plot(v_t,chandata[v_idxvscstates[0]+1],linewidth=2,color='blue',label=chanid.values()[v_idxvscstates[0]+1])
+    ax2 = axs[0].twinx()
+    ax2.plot(v_t,chandata[v_idxvscstates[1]+1],linewidth=2,color='orange',label=chanid.values()[v_idxvscstates[1]+1])
+    axs[0].set_ylabel("VSC states (pu)")
+    # axs[0].set_ylim(-0.1,1.2)
+    handles1, labels1 = axs[0].get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    axs[0].legend(handles1 + handles2, labels1 + labels2, loc="upper right",fontsize=6,bbox_to_anchor=(1,1),frameon=True)
+
+    '''for ix in v_idxvscvarsi:
+        v_i = chandata[ix+1]
+        axs[1].plot(v_t,v_i,linewidth=2)
+        l_legend2.append(chanid.values()[ix+1])'''
+    axs[1].plot(v_t,chandata[v_idxvscvarsi[0]+1],linewidth=2,color='blue',label=chanid.values()[v_idxvscvarsi[0]+1])
+    ax2 = axs[1].twinx()
+    ax2.plot(v_t,-np.array(chandata[v_idxvscvarsi[1]+1]),linewidth=2,color='orange',label="-"+chanid.values()[v_idxvscvarsi[1]+1])
+    v_i = np.sqrt(np.square(chandata[v_idxvscvarsi[0]+1])+np.square(chandata[v_idxvscvarsi[1]+1]))
+    axs[1].plot(v_t,v_i,linewidth=2,color='green',label="Iabs")
+    axs[1].set_ylabel("VSC currents (pu)")
+    # axs[1].set_ylim(0.974,1.006)
+    axs[1].set_xlabel("Time (s)")  
+    handles1, labels1 = axs[1].get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()  
+    axs[1].legend(handles1 + handles2, labels1 + labels2, loc="upper right",fontsize=6,bbox_to_anchor=(1,1),frameon=True)
+
+    for ix in v_idxvscvarsp:
+        v_p = chandata[ix+1]
+        axs[2].plot(v_t,v_p,linewidth=2,label=chanid.values()[ix+1])
+    axs[2].plot(v_t,chandata[v_idxpelec[3]+1],linewidth=2,label=chanid.values()[v_idxpelec[3]+1])
+    axs[2].plot(v_t,np.array(chandata[v_idxqelec[3]+1]),linewidth=2,label=chanid.values()[v_idxqelec[3]+1])
+    axs[2].set_ylabel("Powers (pu)")
+    # axs[1].set_ylim(0.974,1.006)
+    axs[2].set_xlabel("Time (s)")    
+    axs[2].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+
+    
+
+    plt.savefig(os.path.join(str_pathfiles,"VSC.png"),bbox_inches="tight")
+    plt.show()
+    fig.clf()
+    plt.close(fig)
+
     '''# Figure with two plots
     l_legend4 = []
     fig, axs = plt.subplots(2,1) 

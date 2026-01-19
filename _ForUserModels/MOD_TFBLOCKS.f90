@@ -89,7 +89,7 @@ CONTAINS
 		
 	END SUBROUTINE SUB_FIRSTORDERWINDUP
 	
-	SUBROUTINE SUB_WASHOUTWINDUP(y,x,dxdt,u,MODE,DELTAT,T)
+	SUBROUTINE SUB_WASHOUTWINDUP(y,x,dxdt,u,MODE,DELTAT,T,YMAX,YMIN)
 	
 		! T*x(s)*s = y(s) = u(s) - x(s)
 		! y(s) = -x(s) + u(s)  
@@ -101,8 +101,6 @@ CONTAINS
 		REAL, INTENT(OUT) :: dxdt
 		REAL, INTENT(INOUT) :: y, x
 		
-		YMAX = 10e6
-		YMIN = -10e6
 		dxdt = 0.0
 		
 		SELECT CASE (MODE)
@@ -129,7 +127,7 @@ CONTAINS
 				
 	END SUBROUTINE SUB_WASHOUTWINDUP
 	
-	SUBROUTINE SUB_LEADLAGWINDUP(y,x,dxdt,u,MODE,INIDIR,DELTAT,T1,T2)
+	SUBROUTINE SUB_LEADLAGWINDUP(y,x,dxdt,u,MODE,INIDIR,DELTAT,T1,T2,YMAX,YMIN)
 		
 		! T1*x(s)*s = -x(s) + u(s)
 		! y(s) = (1-T2/T1)*x(s) + T2/T1*u(s)
@@ -141,8 +139,6 @@ CONTAINS
 		REAL, INTENT(OUT) :: dxdt
 		REAL, INTENT(INOUT) :: y, x
 		
-		YMAX = 10e6
-		YMIN = -10e6
 		dxdt = 0.0
 		
 		SELECT CASE (MODE)
