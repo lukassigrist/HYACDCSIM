@@ -14,8 +14,8 @@
 ! 3. Excitation stabilizer models, 4. Excitation system models, 5. Turbine-governor models. Turbine governor, stabilizer
 ! and excitation limiter models have no initialization duties other than STATEs and VARs.
 ! 
-! This simple voltage source model, VOLSOU, is NOT implemented as a coordinated-call generator model 
-! (IC = 1 and IT = 0) since ZSORCE is either the transformer impedance or very small (0.001 pu) if a transformer is explicitely modelled. 
+! This simple voltage source model, VOLSOU, is implemented as a coordinated-call generator model 
+! (IC = 1 and IT = 01) since ZSORCE is either the transformer impedance or very small (0.001 pu) if a transformer is explicitely modelled. 
  
 ! ======================================================================================
 ! MODULE DECLARATION
@@ -36,15 +36,15 @@ SUBROUTINE TSCGFO(I_MACH,I_SLOT)
 
 	! Declaration
 	! ----------- 
-	INTEGER :: I_MACH, I_SLOT, IB, I_STATE, I_CON		
-	INTEGER :: ILIMITPRIORITY = 1
+	INTEGER :: I_MACH, I_SLOT, IB, I_STATE, I_CON, I_ICON		
+	INTEGER :: ILIMITPRIORITY, ISHARDCLIMIT
 	   
 	REAL :: xdelta, xecd, xecq
-	REAL :: ectref, ICMAX, icmaxpu
+	REAL :: ectref, ICMAXIN, icmaxinpu
 
 	COMPLEX :: ect_phasor_RI, ict_phasor_RI, us_phasor_RI, ss_phasor
 	COMPLEX :: ect_phasor_dq
-	COMPLEX :: zc, aaa, bbb
+	COMPLEX :: zc
 
 	COMPLEX	:: reference_transf
 	
@@ -54,15 +54,20 @@ SUBROUTINE TSCGFO(I_MACH,I_SLOT)
 	IB = NUMTRM(I_MACH) 		! Bus sequence number
 	I_CON = STRTIN(1,I_SLOT)	! initial CON index
 	I_STATE = STRTIN(2,I_SLOT)	! initial STATE index
+	I_ICON = STRTIN(4,I_SLOT)	! initial ICON index
 
 	! STATES
 	xecd = STATE(I_STATE)         
 	xecq = STATE(I_STATE+1)  
 	xdelta = STATE(I_STATE+2)
 
+	! ICONs
+	ISHARDCLIMIT = ICON(I_ICON+5) 		! Hard current limit
+	ILIMITPRIORITY = ICON(I_ICON+6) 	! Current limit priority
+
 	! CONs
-	ICMAX = CON(I_CON+25) 			! maximum current (pu)
-	icmaxpu = ICMAX*MBASE(I_MACH)/SBASE
+	ICMAXIN = CON(I_CON+26) 						! maximum instantaneous current (pu)
+	icmaxinpu = ICMAXIN*MBASE(I_MACH)/SBASE			! instantaneous current limit (120% of steady-state limit)
 
 	! Common variables
 	us_phasor_RI = VOLT(IB)	
@@ -93,17 +98,19 @@ SUBROUTINE TSCGFO(I_MACH,I_SLOT)
 	        reference_transf = CMPLX(COS(xdelta),SIN(xdelta))
 			ect_phasor_RI = ect_phasor_dq*reference_transf
 			
-			! Hard current limit approximation	.AND.(abs(ict_phasor_RI).GT.icmaxpu)
-			ict_phasor_RI = (ect_phasor_RI - us_phasor_RI)/zc
+			! Hard instantaneous current limit (ict < icmaxinpu)
+			IF (ISHARDCLIMIT.EQ.1) THEN
+				ict_phasor_RI = (ect_phasor_RI - us_phasor_RI)/zc
 
-			CALL SUB_ICMAXLIMITSECREF(ect_phasor_dq, (ict_phasor_RI/reference_transf), (us_phasor_RI/reference_transf), ILIMITPRIORITY, icmaxpu, zc)	
-			ect_phasor_RI = ect_phasor_dq*reference_transf
-			
+				CALL SUB_ICMAXLIMITSECREF(ect_phasor_dq, (ict_phasor_RI/reference_transf), (us_phasor_RI/reference_transf), ILIMITPRIORITY, icmaxinpu, zc)	
+				ect_phasor_RI = ect_phasor_dq*reference_transf
+			END IF
+
 			ict_phasor_RI = (ect_phasor_RI - us_phasor_RI)/zc
             ISORCE(I_MACH) = ect_phasor_RI/zc			 
 			ss_phasor = us_phasor_RI*CONJG(ict_phasor_RI)
 
-			IF ((IFLAG.GT.0).AND.(TIME.GT.-1.5)) WRITE (LPDEV,*) 'TSCGFO - CASE 3: ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_RI/reference_transf),real(ect_phasor_RI*CONJG(ict_phasor_RI))
+			!IF ((IFLAG.GT.0).AND.(TIME.GT.-1.5)) WRITE (LPDEV,*) 'TSCGFO - CASE 3: ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_RI/reference_transf),real(ect_phasor_RI*CONJG(ict_phasor_RI))
 			
 		CASE DEFAULT
 
@@ -135,18 +142,17 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	INTEGER :: I_SLOT, I_MACH, I_VAR, I_CON, I_ICON, I_STATE	! PSS/e indices
 	INTEGER :: IB												! Bus index
 	INTEGER :: IDXCONVERTER, NDCBUS, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS
-	INTEGER :: ILIMITPRIORITY = 0
 	INTEGER, ALLOCATABLE :: m_VSCACDCBUS(:,:) ! ac and dc buses of each converter
 
-    INTEGER :: ierr, I_STATE_DCGRID
+    INTEGER :: ierr, I_STATE_DCGRID, ILIMITPRIORITY
 		
 	REAL :: xecd, xecq, xdelta, xomega, xdc, xpfc, xpod, xq, xitvid, xitviq, xudcpss, xdeltamax, xdeltamin
 	REAL :: d_xecd, d_xecq, d_xdelta, d_xomega, d_xdc, d_xpod, d_xpfc, d_xq, d_xitvid, d_xitviq, d_xudcpss,  d_xdeltamax, d_xdeltamin
 	REAL :: ydc, ypod, yitvid, yitviq, yudcpss, ydeltamax, ydeltamin
 	REAL :: deltap, deltaq, deltaecd, deltaecq
 	
-	REAL :: ps, qs, psref, qsref, us, thetas
-	REAL :: pct, qct, pctref, qctref, ectref, deltapctref, deltaqctref
+	REAL :: ps, qs, us, thetas
+	REAL :: pct, qct, pctref, qctref, ect, ectref, deltapctref, deltaqctref
 	REAL :: ictd, ictq, ict, yecdviimax, yecqviimax
 	REAL :: pdc, udc, udcref
 	REAL :: ploss
@@ -156,8 +162,8 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
     COMPLEX ss_phasor, sct_phasor
 	COMPLEX	reference_transf
 
-	REAL :: TAU, H, D, KPFC, TPFC, KPOD, TPOD, KQ, TQ, RTVR, TTVR, KDCPSS, TUDCPSS, KD_P2, KD_I2, KPVI, SIGMAXR, PCMAX, PCMIN, QCMAX, QCMIN, ALOSS_MW, BLOSS_kV, CLOSS_RECT_Ohm, CLOSS_INV_Ohm, ICMAX, KD_P3, KD_I3
-	REAL :: hpu, dpu, kpfcpu, kpodpu, kqpu, rtvrpu, kdp2pu, kdi2pu, kpvipu, pcmaxpu, pcminpu, qcmaxpu, qcminpu, aloss, bloss, c_inv, c_rect, icmaxpu, kdp3pu, kdi3pu
+	REAL :: TAU, H, D, KPFC, TPFC, KPOD, TPOD, KQ, TQ, RTVR, TTVR, KDCPSS, TUDCPSS, KD_P2, KD_I2, KPVI, SIGMAXR, PCMAX, PCMIN, QCMAX, QCMIN, ALOSS_MW, BLOSS_kV, CLOSS_RECT_Ohm, CLOSS_INV_Ohm, ICMAXSS, ICMAXIN, KD_P3, KD_I3, DELTAWMAX, KICPRIOR
+	REAL :: hpu, dpu, kpfcpu, kpodpu, kqpu, rtvrpu, kdp2pu, kdi2pu, kpvipu, pcmaxpu, pcminpu, qcmaxpu, qcminpu, aloss, bloss, c_inv, c_rect, icmaxsspu, icmaxinpu, kdp3pu, kdi3pu
 
     REAL :: OMEGABASE, FBASE, PI, ZBASE
     PARAMETER (PI=3.14159265358979)
@@ -181,7 +187,8 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	IDGRID = CHRICN(I_ICON+2)			! DC grid identifier
 	NDCBUS_PREVIOUS = ICON(I_ICON+3) 	! accumulated number of DC buses
 	NDCLINES_PREVIOUS = ICON(I_ICON+4) 	! accumulated numnber of DC lines
-		
+	ILIMITPRIORITY = ICON(I_ICON+6) 	! Current limit priority
+			
 	! CONs    
 	TAU = CON(I_CON) 				! Inverter time constant (e.g., 0.01 s)
 	H = CON(I_CON+1) 				! Virtual inertia (e.g., 4 s)
@@ -199,7 +206,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	KD_P2 = CON(I_CON+13) 			! DC voltage control gain (e.g., 0.1 pu)
 	KD_I2 = CON(I_CON+14) 			! DC voltage control integral gain (e.g., 0.1 pu)
 	KPVI = CON(I_CON+15) 			! Virtual impedance current limiter gain (e.g., 0.1 pu)
-	SIGMAXR = CON(I_CON+16) 		! Virtual impedance current limiter X/R relation (e.g., 5 pu)
+	SIGMAXR = CON(I_CON+16) 		! Virtual impedance current limiter X/R relation (e.g., 3 pu)
 	PCMAX = CON(I_CON+17) 			! Maximum power (e.g., 1.0 pu)
 	PCMIN = CON(I_CON+18) 			! Minimum power (e.g., -1.0 pu)
 	QCMAX = CON(I_CON+19) 			! Maximum reactive power (e.g., 0.1 pu)
@@ -208,9 +215,12 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	BLOSS_kV = CON(I_CON+22) 		! linear converter loss coefficient (kV): ploss = aloss + bloss*ict + c*ict^2
 	CLOSS_RECT_Ohm = CON(I_CON+23) 	! rectifier quadratic converter loss coefficient (ohm): ploss = aloss + bloss*ict + c*ict^2
 	CLOSS_INV_Ohm = CON(I_CON+24) 	! constant converter loss coefficient (ohm): ploss = aloss + bloss*ict + c*ict^2
-	ICMAX = CON(I_CON+25) 			! maximum current (pu)
-	KD_P3 = CON(I_CON+26) 			! Max. power angle limiter control gain (e.g., 0.0 pu)
-	KD_I3 = CON(I_CON+27) 			! Max. power angle limiter integral gain (e.g., 0.1 pu)
+	ICMAXSS = CON(I_CON+25) 		! maximum steady-state current (pu)
+	ICMAXIN = CON(I_CON+26) 		! maximum instantaneous current (pu)
+	KICPRIOR = CON(I_CON+27) 		! fraction maximum stead-state current (e.g., 0.8)
+	KD_P3 = CON(I_CON+28) 			! Max. power angle limiter control gain (e.g., 0.0 pu)
+	KD_I3 = CON(I_CON+29) 			! Max. power angle limiter integral gain (e.g., 0.1 pu)
+	DELTAWMAX = CON(I_CON+30) 		! Max. speed variation limit (pu) 
 	
 	! VARs
 	pctref = VAR(I_VAR) 	
@@ -274,7 +284,8 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	pcminpu = PCMIN*MBASE(I_MACH)/SBASE			
 	qcmaxpu = QCMAX*MBASE(I_MACH)/SBASE			
 	qcminpu = QCMIN*MBASE(I_MACH)/SBASE
-	icmaxpu = ICMAX*MBASE(I_MACH)/SBASE
+	icmaxsspu = ICMAXSS*MBASE(I_MACH)/SBASE
+	icmaxinpu = ICMAXIN*MBASE(I_MACH)/SBASE				
 	kpvipu = KPVI*SBASE/MBASE(I_MACH)
 	ZBASE = BASVLT(IB)**2/SBASE             ! AC-side Zbase in ohms
 	aloss = ALOSS_MW/SBASE                 
@@ -284,6 +295,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	kdp3pu = KD_P3*MBASE(I_MACH)/SBASE			
 	kdi3pu = KD_I3*MBASE(I_MACH)/SBASE
 
+	
 	! Common variables
 	ALLOCATE(v_udc0(NDCBUS,1)) ! allocate size
 	ALLOCATE(m_VSCACDCBUS(NDCBUS,2))
@@ -310,6 +322,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	ps = REAL(ss_phasor)
 	qs = AIMAG(ss_phasor)
 	ect_phasor_RI = zc*ISORCE(I_MACH)
+	ect = ABS(ect_phasor_RI)
 	sct_phasor = ect_phasor_RI*CONJG(ict_phasor_RI)
 	pct = REAL(sct_phasor)
 	qct = AIMAG(sct_phasor) 
@@ -319,7 +332,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 	ictd = REAL(ict_phasor_dq)
 	ictq = AIMAG(ict_phasor_dq)
 
-	IF ((TIME.GT.-1.5)) WRITE (LPDEV,*) 'VSCGFO - CASE ',MODE ,': ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_dq),pct
+	! IF ((TIME.GT.-1.5)) WRITE (LPDEV,*) 'VSCGFO - CASE ',MODE ,': ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_dq),pct
 
 	SELECT CASE (MODE)
 
@@ -346,7 +359,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			qctref = qct
 			deltapctref = 0.0
 			deltaqctref = 0.0
-            ectref = ABS(ect_phasor_RI)	
+            ectref = ect	
 			xdelta = ATAN2(AIMAG(ect_phasor_RI),REAL(ect_phasor_RI))
 			
 			reference_transf = CMPLX(cos(xdelta),sin(xdelta))
@@ -355,8 +368,8 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			ictd = REAL(ict_phasor_dq)
 			ictq = AIMAG(ict_phasor_dq)
 			ict = ABS(ict_phasor_RI)
-			IF (ict.GT.icmaxpu) THEN
-				WRITE (LPDEV,*) 'VSCGFO - CASE 1: Current exceeds limit of ',icmaxpu,' pu.'
+			IF (ict.GT.icmaxsspu) THEN
+				WRITE (LPDEV,*) 'VSCGFO - CASE 1: Current exceeds steady-state limit of ',icmaxsspu,' pu.'
 			END IF		
 
 			! DC-side voltage, current, power
@@ -389,8 +402,8 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			yitvid = 0.0
 			yitviq = 0.0
 			yudcpss = 0.0
-			ydeltamax = 10E9 ! asin(REAL(zc))+thetas
-			ydeltamin = -10E9! asin(-REAL(zc))+thetas
+			ydeltamax = 10E9!asin(AIMAG(zc)*icmaxsspu)+thetas
+			ydeltamin = -10E9!-asin(AIMAG(zc)*icmaxsspu)+thetas
 			d_xdeltamax = 0.0
 			d_xdeltamin = 0.0
 
@@ -405,11 +418,11 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			CALL SUB_WASHOUTWINDUP(ypod,xpod,d_xpod,-(xomega-1.0),1,DELTAT,TPOD,10e9,-10e9)
 			CALL SUB_FIRSTORDERWINDUP(xpfc,xpfc,d_xpfc,-(xomega-1.0),1,-1,DELTAT,TPFC,(pcmaxpu-pctref)/kpfcpu,(pcminpu-pctref)/kpfcpu)
 			
-			!CALL SUB_PI(ydeltamax,xdeltamax,d_xdeltamax,(pcmaxpu-ictd),1,DELTAT,0.0,kdi3pu,asin(REAL(zc))+thetas,0.0)
-			!CALL SUB_PI(ydeltamin,xdeltamin,d_xdeltamin,(-pcmaxpu-ictd),1,DELTAT,0.0,kdi3pu,0.0,asin(-REAL(zc))+thetas)
+			!CALL SUB_PI(ydeltamax,xdeltamax,d_xdeltamax,(pcmaxpu/ect-ictd),1,DELTAT,0.0,kdi3pu,asin(AIMAG(zc*icmaxsspu))+thetas,thetas)
+			!CALL SUB_PI(ydeltamin,xdeltamin,d_xdeltamin,(-pcmaxpu/ect-ictd),1,DELTAT,0.0,kdi3pu,thetas,-asin(AIMAG(zc*icmaxsspu))+thetas)
 			
 			deltap = min(max(ydc + deltapctref  + kpfcpu*xpfc + kpodpu*ypod - dpu*(xomega-1.0),pcminpu),pcmaxpu) - (pct + ploss)	
-			CALL SUB_INTEGRATORWINDUP(xomega,xomega,d_xomega,deltap,1,hpu,10e9,-10e9)
+			CALL SUB_INTEGRATORWINDUP(xomega,xomega,d_xomega,deltap,1,hpu,1.0+DELTAWMAX,1.0-DELTAWMAX)
             CALL SUB_INTEGRATORWINDUP(xdelta,xdelta,d_xdelta,(xomega-1.0),1,(1/OMEGABASE),ydeltamax,ydeltamin)
 
 			! AC voltage control
@@ -429,8 +442,8 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			CALL SUB_FIRSTORDERWINDUP(xecd,xecd,d_xecd,deltaecd,1,-1,DELTAT,TAU,10e9,-10e9)
 			CALL SUB_FIRSTORDERWINDUP(xecq,xecq,d_xecq,deltaecq,1,-1,DELTAT,TAU,10e9,-10e9)  	
 			
-			WRITE (LPDEV,*) 'VSCGFO - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized.'   
-			WRITE (LPDEV,*) 'VSCGFO - CASE 1: delta = ',xdelta,', deltamax = ',(asin(REAL(zc))+thetas),', thetas = ',thetas
+			WRITE (LPDEV,*) 'VSCGFO - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized. Initial conditions of states K+11/12 might be suspect.'  
+			WRITE (LPDEV,*) 'VSCGFO - CASE 1: delta = ',xdelta,', deltamax = ',(asin(AIMAG(zc))+thetas),', thetas = ',thetas
 			
 			EFD(I_MACH) = ectref
             SPEED(I_MACH) = xomega-1.0
@@ -449,7 +462,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, aloss, bloss, c_inv, c_rect)
 			! VI immpedance current limiter	modifying dq voltage references
 			! If zvi = kpvipu*(1+jSIGMAXR) = zc*exp(j*phi), VI impedance and hard current limit are the same		
-			CALL SUB_ZVILIMITSECREF(yecdviimax, yecqviimax, ict_phasor_dq, icmaxpu, kpvipu, SIGMAXR)
+			CALL SUB_ZVILIMITSECREF(yecdviimax, yecqviimax, ict_phasor_dq, icmaxsspu, kpvipu, SIGMAXR)
 			
 			deltap = min(max(ydc + deltapctref  + kpfcpu*xpfc + kpodpu*ypod - dpu*(xomega-1.0),pcminpu),pcmaxpu) - (pct + ploss)
 			deltaq = qctref + deltaqctref - qct
@@ -460,10 +473,10 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			CALL SUB_WASHOUTWINDUP(ypod,xpod,d_xpod,-(xomega-1.0),2,DELTAT,TPOD,10e9,-10e9)
 			CALL SUB_FIRSTORDERWINDUP(xpfc,xpfc,d_xpfc,-(xomega-1.0),2,0,DELTAT,TPFC,(pcmaxpu-pctref)/kpfcpu,(pcminpu-pctref)/kpfcpu)
 			
-			!CALL SUB_PI(ydeltamax,xdeltamax,d_xdeltamax,(pcmaxpu-ictd),2,DELTAT,0.0,kdi3pu,asin(REAL(zc))+thetas,0.0)
-			!CALL SUB_PI(ydeltamin,xdeltamin,d_xdeltamin,(-pcmaxpu-ictd),2,DELTAT,0.0,kdi3pu,0.0,asin(-REAL(zc))+thetas)
+			!CALL SUB_PI(ydeltamax,xdeltamax,d_xdeltamax,(pcmaxpu/ect-ictd),2,DELTAT,0.0,kdi3pu,asin(AIMAG(zc*icmaxsspu))+thetas,thetas)
+			!CALL SUB_PI(ydeltamin,xdeltamin,d_xdeltamin,(-pcmaxpu/ect-ictd),2,DELTAT,0.0,kdi3pu,thetas,-asin(AIMAG(zc*icmaxsspu))+thetas)
 
-			CALL SUB_INTEGRATORWINDUP(xomega,xomega,d_xomega,deltap,2,hpu,10e9,-10e9)
+			CALL SUB_INTEGRATORWINDUP(xomega,xomega,d_xomega,deltap,2,hpu,1.0+DELTAWMAX,1.0-DELTAWMAX)
             CALL SUB_INTEGRATORWINDUP(xdelta,xdelta,d_xdelta,(xomega-1.0),2,(1/OMEGABASE),ydeltamax,ydeltamin)
 			
 			CALL SUB_FIRSTORDERWINDUP(xq,xq,d_xq,deltaq,2,0,DELTAT,TQ,(qcmaxpu-qctref)/kqpu,(qcminpu-qctref)/kqpu)
@@ -490,7 +503,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 
 			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, aloss, bloss, c_inv, c_rect)
 			! VI immpedance current limiter	modifying dq voltage references
-			CALL SUB_ZVILIMITSECREF(yecdviimax, yecqviimax, ict_phasor_dq, icmaxpu, kpvipu, SIGMAXR)
+			CALL SUB_ZVILIMITSECREF(yecdviimax, yecqviimax, ict_phasor_dq, icmaxsspu, kpvipu, SIGMAXR)
 			
 			deltap = min(max(ydc + deltapctref  + kpfcpu*xpfc + kpodpu*ypod - dpu*(xomega-1.0),pcminpu),pcmaxpu) - (pct + ploss)
 			deltaq = qctref + deltaqctref - qct
@@ -502,10 +515,10 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			CALL SUB_WASHOUTWINDUP(ypod,xpod,d_xpod,-(xomega-1.0),3,DELTAT,TPOD,10e9,-10e9)
 			CALL SUB_FIRSTORDERWINDUP(xpfc,xpfc,d_xpfc,-(xomega-1.0),3,0,DELTAT,TPFC,(pcmaxpu-pctref)/kpfcpu,(pcminpu-pctref)/kpfcpu)
 
-			!CALL SUB_PI(ydeltamax,xdeltamax,d_xdeltamax,(pcmaxpu-ictd),3,DELTAT,0.0,kdi3pu,asin(REAL(zc))+thetas,0.0)
-			!CALL SUB_PI(ydeltamin,xdeltamin,d_xdeltamin,(-pcmaxpu-ictd),3,DELTAT,0.0,kdi3pu,0.0,asin(-REAL(zc))+thetas)
+			!CALL SUB_PI(ydeltamax,xdeltamax,d_xdeltamax,(pcmaxpu/ect-ictd),3,DELTAT,0.0,kdi3pu,asin(AIMAG(zc*icmaxsspu))+thetas,thetas)
+			!CALL SUB_PI(ydeltamin,xdeltamin,d_xdeltamin,(-pcmaxpu/ect-ictd),3,DELTAT,0.0,kdi3pu,thetas,-asin(AIMAG(zc*icmaxsspu))+thetas)
 
-			CALL SUB_INTEGRATORWINDUP(xomega,xomega,d_xomega,deltap,3,hpu,10e9,-10e9)
+			CALL SUB_INTEGRATORWINDUP(xomega,xomega,d_xomega,deltap,3,hpu,1.0+DELTAWMAX,1.0-DELTAWMAX)
             CALL SUB_INTEGRATORWINDUP(xdelta,xdelta,d_xdelta,(xomega-1.0),3,(1/OMEGABASE),ydeltamax,ydeltamin)
 			
 			CALL SUB_FIRSTORDERWINDUP(xq,xq,d_xq,deltaq,3,0,DELTAT,TQ,(qcmaxpu-qctref)/kqpu,(qcminpu-qctref)/kqpu)
@@ -522,7 +535,7 @@ SUBROUTINE VSCGFO(I_MACH,I_SLOT)
 			
 			! Hard current limit approximation (should be actually placed in the network solution model due to the voltage dependency)	
 			! ict_phasor_dq = (ect_phasor_dq - us_phasor_RI/reference_transf)/zc
-			! CALL SUB_ICMAXLIMITSECREF(ect_phasor_dq, ict_phasor_dq, (us_phasor_RI/reference_transf), ILIMITPRIORITY, icmaxpu, zc)		
+			! CALL SUB_ICMAXLIMITSECREF(ect_phasor_dq, ict_phasor_dq, (us_phasor_RI/reference_transf), ILIMITPRIORITY, icmaxsspu, zc)		
 			! ect_phasor_RI = ect_phasor_dq*reference_transf
             ! ISORCE(I_MACH) = ect_phasor_RI/zc       
 

@@ -17,8 +17,8 @@ import numpy as np
 # User-defined input
 # ------------------
 # file name and paths
-str_lffile = r"kundur32_AC.sav" # initial AC load flow"
-str_dyrfile = r"kundur.dyr" # initial AC load flow"
+str_lffile = r"kundur32_noAC_MTDCg.sav" # initial AC load flow"
+str_dyrfile = r"kundur_MTDCg.dyr" # initial AC load flow"
 str_dllfile = r"USRSOU.dll"
 str_pathfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\TestSystem" # Path
 
@@ -26,9 +26,9 @@ str_pathfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\P
 TSTEP = 0.002
 TYSLACCFAC = 0.8
 TYSLTOL = 0.0001
-TYSLMAXITER = 75
+TYSLMAXITER = 125
 TINI = 1
-TFINAL = 1
+TFINAL = 20
 
 # ------------
 # Preparations
@@ -92,11 +92,13 @@ if __name__ == "__main__":
     psspy.chsb(0,1,[-1,-1,-1,1,7,0]) # speed
 
     # Add user-defined output channels (e.g., state variables of a user-defined model)
-    ierr, I_STATE_VSC = psspy.mdlind(4,"""1""",'GEN','STATE')
-    ierr, I_VAR_VSC = psspy.mdlind(4,"""1""",'GEN','VAR')
-    # ierr, I_STATE_VSC = psspy.mdlind(9,"""14""",'GEN','STATE') 
-    # ierr, I_STATE_DCGRID = psspy.mdlind(7,"""14""",'GOV','STATE') 
-    psspy.state_channel([-1, I_STATE_VSC], r"xecd")
+    # ierr, I_STATE_VSC = psspy.mdlind(4,"""1""",'GEN','STATE')
+    # ierr, I_VAR_VSC = psspy.mdlind(4,"""1""",'GEN','VAR')
+    ierr, I_STATE_VSC = psspy.mdlind(9,"""14""",'GEN','STATE') 
+    ierr, I_VAR_VSC = psspy.mdlind(9,"""14""",'GEN','VAR')
+    ierr, I_STATE_DCGRID = psspy.mdlind(7,"""14""",'GOV','STATE') 
+    # VSCGFO
+    '''psspy.state_channel([-1, I_STATE_VSC], r"xecd")
     psspy.state_channel([-1, I_STATE_VSC+1], r"xecq")
     psspy.state_channel([-1, I_STATE_VSC+2], r"delta")
     psspy.state_channel([-1, I_STATE_VSC+3], r"omega")
@@ -105,7 +107,16 @@ if __name__ == "__main__":
     psspy.var_channel([-1, I_VAR_VSC+13], r"id")
     psspy.var_channel([-1, I_VAR_VSC+14], r"iq")
     psspy.var_channel([-1, I_VAR_VSC+15], r"deltap")
-    psspy.var_channel([-1, I_VAR_VSC+16], r"pdc")
+    psspy.var_channel([-1, I_VAR_VSC+16], r"pdc")'''
+    # VSCODRO
+    psspy.state_channel([-1, I_STATE_VSC], r"xec")
+    psspy.state_channel([-1, I_STATE_VSC+1], r"delta")
+    psspy.state_channel([-1, I_STATE_DCGRID], r"udc1")
+    psspy.state_channel([-1, I_STATE_DCGRID+1], r"udc2")
+    psspy.var_channel([-1, I_VAR_VSC+11], r"id")
+    psspy.var_channel([-1, I_VAR_VSC+12], r"iq")
+    psspy.var_channel([-1, I_VAR_VSC+13], r"deltap")
+    psspy.var_channel([-1, I_VAR_VSC+14], r"pc+ploss")
 
     # Add user-defined dynamic model
     psspy.addmodellibrary(str_pathdllfile)
@@ -136,10 +147,13 @@ if __name__ == "__main__":
     v_idxefd = range(4*NMACHINES,5*NMACHINES)
     v_idxpmech = range(5*NMACHINES,6*NMACHINES)
     v_idxspeed = range(6*NMACHINES,7*NMACHINES)
-    v_idxvscstates = range(7*NMACHINES+2,7*NMACHINES+4) 
-    # v_idxdcgridstates = range(7*NMACHINES+2,7*NMACHINES+4) 
-    v_idxvscvarsi = range(7*NMACHINES+4,7*NMACHINES+6) 
-    v_idxvscvarsp = range(7*NMACHINES+7,7*NMACHINES+8) 
+    # v_idxvscstates = range(7*NMACHINES+2,7*NMACHINES+4) # VSCGFO
+    v_idxvscstates = range(7*NMACHINES,7*NMACHINES+2) # VSCDRO
+    v_idxdcgridstates = range(7*NMACHINES+2,7*NMACHINES+4) # DCGRID
+    # v_idxvscvarsi = range(7*NMACHINES+4,7*NMACHINES+6) # VSCGFO
+    # v_idxvscvarsp = range(7*NMACHINES+7,7*NMACHINES+8) # VSCGFO
+    v_idxvscvarsi = range(7*NMACHINES+4,7*NMACHINES+6) # VSCDRO
+    v_idxvscvarsp = range(7*NMACHINES+7,7*NMACHINES+8) # VSCDRO
 
     fontP = FontProperties()
     fontP.set_size('small')
@@ -245,30 +259,27 @@ if __name__ == "__main__":
     fig.clf()
     plt.close(fig)
 
-    '''# Figure with two plots
+    # Figure with two plots
     l_legend4 = []
     fig, axs = plt.subplots(2,1) 
     for ix in v_idxvscstates:
         v_x = chandata[ix+1]
-        axs[0].plot(v_t,v_x,linewidth=2)
-        l_legend4.append(chanid.values()[ix+1]) 
+        axs[0].plot(v_t,v_x,linewidth=2,label=chanid.values()[ix+1]) 
     axs[0].set_ylabel("VSC states (pu)")
-    axs[0].set_ylim(-0.5,4.5)
+    # axs[0].set_ylim(-0.5,4.5)
 
     l_legend5 = []
     for ix in v_idxdcgridstates:
         v_udc = chandata[ix+1]
-        axs[1].plot(v_t,v_udc,linewidth=2)
-        l_legend5.append(chanid.values()[ix+1]) 
+        axs[1].plot(v_t,v_udc,linewidth=2,label=chanid.values()[ix+1])
     axs[1].set_ylabel("DC grid states (pu)")
-    axs[1].set_ylim(0.974,1.006)
+    # axs[1].set_ylim(0.974,1.006)
     axs[1].set_xlabel("Time (s)")
 
-    axs[0].legend(l_legend4,loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
-    axs[1].legend(l_legend5,loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+    axs[0].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+    axs[1].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
 
     plt.savefig(os.path.join(str_pathfiles,"States.png"),bbox_inches="tight")
     plt.show()
     fig.clf()
     plt.close(fig)
-    '''
