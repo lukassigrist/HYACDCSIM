@@ -178,12 +178,12 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	REAL KD_Pps, KD_Pudc, KD_Ips, KD_Iudc, KD_D2, KQ_Pqs, KQ_Iqs, KQ_Pus, KQ_Ius
 	REAL ICMAX
 	REAL PSMAX, PSMIN, QSMAX, QSMIN
-	REAL ALOSS_MW, BLOSS_kV, CLOSS_RECT_Ohm, CLOSS_INV_Ohm
+	REAL ALOSS, BLOSS, CLOSSRECT, CLOSSINV
 	REAL UDC_MAX, UDC_MIN, TUDCMAX, TUDCMIN
 
 	REAL icmaxpu
 	REAL psmaxpu, psminpu, qsmaxpu, qsminpu
-	REAL aloss, bloss, c_rect, c_inv
+	REAL alosspu, blosspu, clossrectpu, clossinvpu
 	REAL ZBASE
 	COMPLEX zc
 	REAL ploss
@@ -194,8 +194,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	REAL fmodulationpwm, FMODULATIONPWMMAX
 
 	REAL :: yetad, yndc, ymd, ynq, ymq
-
-	
 
 	! COMMON /svsconinternal/ I_STATE_DCGRID_G, aux_var_GLOBAL ! This allows saving the value of I_STATE_DCGRID_G between calls. Note that I_STATE_DCGRID_G takes the value of the first DCGRID model read.
 
@@ -226,10 +224,10 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 	UDC_MAX = CON(I_CON+15)
 	UDC_MIN = CON(I_CON+16)
 	FMODULATIONPWMMAX = CON(I_CON+17)
-	ALOSS_MW = CON(I_CON+18) 		! constant converter loss coefficient (MW): ploss = aloss + bloss*ic + c*ic^2
-	BLOSS_kV = CON(I_CON+19) 		! linear converter loss coefficient (kV): ploss = aloss + bloss*ic + c*ic^2
-	CLOSS_RECT_Ohm = CON(I_CON+20) 	! rectifier quadratic converter loss coefficient (ohm): ploss = aloss + bloss*ic + c*ic^2
-	CLOSS_INV_Ohm = CON(I_CON+21) 	! constant converter loss coefficient (ohm): ploss = aloss + bloss*ic + c*ic^2
+	ALOSS = CON(I_CON+18) 		! constant converter loss coefficient (MW): ploss = alosspu + blosspu*ic + c*ic^2
+	BLOSS = CON(I_CON+19) 		! linear converter loss coefficient (kV): ploss = alosspu + blosspu*ic + c*ic^2
+	CLOSSRECT = CON(I_CON+20) 	! rectifier quadratic converter loss coefficient (ohm): ploss = alosspu + blosspu*ic + c*ic^2
+	CLOSSINV = CON(I_CON+21) 	! constant converter loss coefficient (ohm): ploss = alosspu + blosspu*ic + c*ic^2
 	TUDCMIN = CON(I_CON+24) 		! DC undervoltage protection delay
 	TUDCMAX = CON(I_CON+25) 		! DC overvoltage protection delay
 
@@ -316,10 +314,10 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 
 	ZBASE = BASVLT(IB)**2/SBASE             ! AC-side Zbase in ohms
 
-	aloss = ALOSS_MW/SBASE                  ! losses coefs in system base
-	bloss = BLOSS_kV/SQRT(3.0)/BASVLT(IB)
-	c_rect = CLOSS_RECT_Ohm/ZBASE
-	c_inv = CLOSS_INV_Ohm/ZBASE
+	alosspu = ALOSS*MBASE(I_MACH)/SBASE                  ! losses coefs in system base
+	blosspu = BLOSS
+	clossrectpu = CLOSSRECT*SBASE/MBASE(I_MACH) 
+	clossinvpu = CLOSSINV*SBASE/MBASE(I_MACH) 
 
 	zc = ZSORCE(I_MACH)*SBASE/MBASE(I_MACH)  ! conexion impedance in system base
 
@@ -390,7 +388,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 			pvsc = ps0 + REAL(zc)*(ic**2) 
 
 			! DC-side voltage, current, power
-			CALL SUB_COMPUTEPLOSS(ploss, ps0, ic, aloss, bloss, c_inv, c_rect)
+			CALL SUB_COMPUTEPLOSS(ploss, ps0, ic, alosspu, blosspu, clossinvpu, clossrectpu)
 			pdc = -(pvsc + ploss)
 			udc = v_udc0(IDXCONVERTER,1) ! extract initial dc voltage value
 			udc0 = udc
@@ -560,7 +558,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		fmodulationpwm = ec/MAX(udc,0.0001)
 
 		! DC-side converter current current and power
-		CALL SUB_COMPUTEPLOSS(ploss, ps, ic, aloss, bloss, c_inv, c_rect)	
+		CALL SUB_COMPUTEPLOSS(ploss, ps, ic, alosspu, blosspu, clossinvpu, clossrectpu)	
 		pdc = -(pvsc + ploss) 
 		idc = pdc/udc ! output of the converter model; input of the DC-grid model
 		
@@ -569,7 +567,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		ETERM(I_MACH) = us
 		PELEC(I_MACH) = ps 							! in pu system rating
 		QELEC(I_MACH) = -us*icq 					! in pu system rating
-		
 				  
 	CASE (4) 
 
@@ -628,9 +625,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 
 	VAR(I_VAR+27) = udc0
 	VAR(I_VAR+24) = idc0
-
-	
-
 
 	VAR(I_VAR+32) = fmodulationpwm
 	VAR(I_VAR+33) = counter_uvdc
