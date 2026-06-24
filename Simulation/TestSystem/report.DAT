@@ -38,6 +38,10 @@ Reached tolerance in 1 iterations
 
 Largest mismatch:     -0.00 MW      0.00 Mvar      0.00 MVA at bus 3 [BUS3        20.000]
 System total absolute mismatch:                    0.00 MVA
+
+Warning: Incomplete data record for model "VSCGFL"
+Processing record with missing data set to zero
+7 'USRMDL' 14 'VSCGFL'  1  1  8  26  7  37   1  2 2 1 2 'A' 0 0 0.005 0.00 0.0 20.0 400.0 0.0 0.0 0.0 15.0 300.0 1.00 500 -500 200 -
 Out of file data--switch to terminal input mode
 
 Generator models use:
@@ -158,7 +162,7 @@ VSCDRO - CASE 1: Converter  2  at bus  9  with id 14: deltap =  0.000000
 , dw =  0.000000 , deltaq =  0.000000 , deltaec =  1.028692
 DCGRID - CASE1 1: DC grid at AC bus  7  with id 14 initialized.
 
-    PTI INTERACTIVE POWER SYSTEM SIMULATOR--PSS(R)E     WED, JUN 17 2026  12:37
+    PTI INTERACTIVE POWER SYSTEM SIMULATOR--PSS(R)E     TUE, JUN 23 2026  18:34
  TWO AREA MULTI-MACHINE TEST SYSTEM
 
 
