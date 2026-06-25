@@ -1,5 +1,5 @@
 """
-This code implements the building of the static and dynamic MTDC grids and the solutions of the resulting AC/DC load flow.
+This code implements the building of the static and dynamic MTDC grids and the solutions of the resulting AC/DC power flow.
 
 From a static point of view, MTDC grids are modelled as:
 
@@ -8,7 +8,7 @@ From a static point of view, MTDC grids are modelled as:
 - Vdc/Pdc sources at the DC side
 - RL branches at the DC side
 
-This code first calls the subroutines of a sequential AC/DC load flow. Note that the corresponding call can substitute the standard PSS/E power flow solution API to simulat AC/DC load flows. The results of the load flow can be optionally shown.
+This code first calls the subroutines of a sequential AC/DC power flow. Note that the corresponding call can substitute the standard PSS/E power flow solution API to simulat AC/DC power flows. The results of the power flow can be optionally shown.
 
 From the dynamic point of view, the dynamics of the multiple MTDC grids are modelled by now through a single dynamic model with the number of states updated according to the number of MTDC grids and its elements. Converters and their controls have individual models.
 
@@ -19,13 +19,14 @@ This model finally creates the data files necessary for the dynamic simulations.
 
 Inputs:
 - Static MTDC data (data in PYPOWER format - .py file)
-- Static load flow file (in PSS/e format - .sav file)
+- Static power flow file (in PSS/e format - .sav file)
 
 Authors: 
 - Aurelio Garcia Cerrada
 - Javier Renedo
 - Carlos Prieto
 - Lukas Sigrist
+- Saeed Rezaeian-Marjani
 """
 
 # ---------
@@ -37,7 +38,7 @@ import os, sys
 import psse34 
 import psspy, redirect
 redirect.psse2py()
-# Hybrid AC/DC load flow solution and dynamic simulation preparation
+# Hybrid AC/DC power flow solution and dynamic simulation preparation
 from _PyModules import module_acdc
 
 
@@ -46,20 +47,21 @@ from _PyModules import module_acdc
 # ------------------
 
 # file name and paths
-str_lffile = r"kundur32_noAC.sav" # initial AC load flow"
-str_dyrfile = r"kundur.dyr" # initial AC load flow"
+str_lffile = r"kundur32_noAC.sav" # initial AC power flow"
+str_dyrfile = r"kundur.dyr" # initial AC power flow"
 str_pathlffile = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC" # Path
 str_path4dynamics = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC" # Path
+str_MTDCdatafile = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\define_grids_mtdc.xls" # Path to the input VSCs data Excel file
 
 sys.path.append(str_pathlffile)
-import define_grids_mtdc # MTDC grid definition (.py) - USER DEFINED
+##import define_grids_mtdc # MTDC grid definition (.py) - USER DEFINED
 
 # saving and showing options
 issetdynamicfiles = True # build dynamic files
 issavedclfresults = False
 isprogress = 2 # 6 no progress, 1 standard destination, 2 file
 
-# AC and DC load flow
+# AC and DC power flow
 lftol = 1e-4 # lftolerance
 lfmaxiter = 20 # Max number of iterations 
  
@@ -74,27 +76,22 @@ idowner = 8 # idem
 d_acdcoptions = dict(issetdynamicfiles=issetdynamicfiles,issavedclfresults=issavedclfresults,isprogress=isprogress,
     lftol=lftol,lfmaxiter=lfmaxiter,idconv=idconv,idowner=idowner)
 
-str_savfileorig = os.path.join(str_pathlffile,str_lffile)  # initial AC load flow
-str_dyrfileorig = os.path.join(str_pathlffile,str_dyrfile)  # initial AC load flow
+str_savfileorig = os.path.join(str_pathlffile,str_lffile)  # initial AC power flow
+str_dyrfileorig = os.path.join(str_pathlffile,str_dyrfile)  # initial AC power flow
 
 str_pathdclfresults = str_pathlffile
 
 if __name__ == "__main__":
-
-    # add multiple MTDC dictionaries to the MTDCgrid list
-    l_MTDCgrids = []
-    l_MTDCgrids.append(define_grids_mtdc.MTDC_1())
-    # l_MTDCgrids.append(define_grids_mtdc.MTDC_2())
     
     # initialize PSS/e
     psspy.psseinit(2000)
 
-    # run ACDC load flow
-    [d_acdcoutput, success, it, k_int_ac, k_int_dc, k_int_dcslack, j_int_dcslack, MM_Pdc_bus] = module_acdc.main_runacdclf(d_acdcoptions, 
-    str_savfileorig, str_pathdclfresults, l_MTDCgrids)
+    # run ACDC power flow
+    [d_acdcoutput, success, it, k_int_ac, k_int_dc, k_int_dcslack, j_int_dcslack, MM_Pdc_bus, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus] = module_acdc.main_runacdclf(d_acdcoptions, 
+    str_savfileorig, str_pathdclfresults, str_MTDCdatafile)
     
-    # show load flow results if needed
+    # show power flow results if needed
     module_acdc.fun_showacdclfoutput(isprogress, issavedclfresults, str_pathdclfresults, d_acdcoutput)  
     
     # write the files needed for dynamic simulations (.txt for DC grid) and update .dyr file
-    module_acdc.main_setacdcdynamicdata(d_acdcoutput, str_dyrfileorig, str_path4dynamics, d_acdcoptions, l_MTDCgrids)  
+    module_acdc.main_setacdcdynamicdata(d_acdcoutput, str_dyrfileorig, str_path4dynamics, d_acdcoptions, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus)  

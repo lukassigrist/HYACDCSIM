@@ -166,10 +166,10 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 		w_fil = 0.0
 		xw = w_fil
 		
-		!WRITE (LPDEV,*) 'SPWDRD - MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH)
+		WRITE (LPDEV,*) 'SPWDRD - CASE 1: MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH),' initialized.'
 		!WRITE (LPDEV,*) 'SPWDRD - CASE 1: Kdc, Kf, K_alpha = ',Kdc, Kf, K_alpha
 		!WRITE (LPDEV,*) 'SPWDRD - CASE 1: delta_f, delta_angle = ',delta_f, delta_angle
-		!WRITE (LPDEV,*) 'SPWDRD - CASE 1: I_VARCONV,ps_initial = ',I_VARCONV,VAR(I_VARCONV)
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 1: I_VARCONV,ps_initial = ',I_VARCONV,ps_ini
 					
 	CASE (2) 
 	   
@@ -184,7 +184,9 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 			ew = 2*(theta_bus - deltau_ini) - 2*deltaw_ref
 		END IF			
 				
-		
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 2: MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH)
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 2: ew = ',ew, ' w_fil = ',w_fil, ' xw = ',xw
+
 		
 		IF (TF.LT.(2*DELTAT)) THEN
 			d_w_fil = 0.0
@@ -199,7 +201,7 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 		ELSE
 			d_xw  = (-xw + w_fil)/TW
 		END IF
-
+        
 	CASE (3) 
 
 		! Compute output
@@ -257,6 +259,8 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 		omega_est_i = addps_ref*Kf + deltaw_bus
 
 		VAR(I_VARCONV+29) = addps_ref ! put the power reference in the converter
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 3: MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH)
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 3: addps_ref = ',addps_ref, ' addps_ref_dc = ',addps_ref_dc, ' addps_ref_supp = ',addps_ref_supp
 
 	CASE (4) 
 

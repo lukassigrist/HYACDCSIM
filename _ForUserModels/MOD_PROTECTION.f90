@@ -15,7 +15,7 @@ CONTAINS
 	      REAL, INTENT(IN) :: udc, timenow
 	      REAL, INTENT(IN) :: UDCMAX, TUDCMAX
             CHARACTER(LEN=6), INTENT(IN) :: MODEL
-	
+	      
 	      IF (udc.GT.UDCMAX) THEN 
 
 		      IF (counter .EQ. 0.0) THEN
