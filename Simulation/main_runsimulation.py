@@ -45,6 +45,7 @@ str_pathcompilefile = os.path.join(str_pathsimfiles, r"compile")
 
 # Set working directory to the simulation folder,
 # where the DLL, Fortran-related files, and auxiliary .txt files are located
+os.chdir(str_pathsimfiles)
 print("Current Working Directory:", os.getcwd())
 
 # ----------
@@ -54,7 +55,7 @@ if __name__ == "__main__":
     redirect.psse2py()
    
     psspy.psseinit(2000)
-    psspy.progress_output(2,"report",[0,0])
+    psspy.progress_output(2,"progress",[0,0])
 
     # Open file and run load flow
     psspy.case(str_pathlffile)
