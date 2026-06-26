@@ -60,8 +60,8 @@ SUBROUTINE TSCGFL(I_MACH,I_SLOT)
     I_VAR = STRTIN(3,I_SLOT)
 
     ! VARs
-    icd = VAR(I_VAR+8)
-    icq = VAR(I_VAR+9)
+    icd = VAR(I_VAR+15)
+    icq = VAR(I_VAR+16)
 
     ! Common variables
     us_phasor_RI = VOLT(IB)
@@ -109,8 +109,8 @@ SUBROUTINE TSCGFL(I_MACH,I_SLOT)
     ETERM(I_MACH) = ABS(us_phasor_RI)
 
     ! VARs
-    VAR(I_VAR+8) = icd
-    VAR(I_VAR+9) = icq
+    VAR(I_VAR+15) = icd
+    VAR(I_VAR+16) = icq
 
 END SUBROUTINE TSCGFL
 
@@ -124,7 +124,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     USE MOD_READHYADCSIM                                        ! use module for reading the HYACDCSIM text files
     USE MOD_MISC                                                ! use module for miscellaneous functions
     USE MOD_VSCGFL_INTERNAL                                     ! use module for global VSCGFL-related variables
-    USE module_globalmatrices, ONLY: REGISTER_DCG               ! use automatic DC-grid registration for offset calculation
+    USE MOD_DCGRID, ONLY: REGISTER_DCG               ! use automatic DC-grid registration for offset calculation
     INCLUDE 'COMON4.INS'                                        ! common PSS/e variables and modules
     IMPLICIT NONE
 
@@ -132,17 +132,17 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     ! -----------
     INTEGER IB, I_SLOT, I_MACH, I_VAR, I_CON, I_ICON, I_STATE        ! PSS/e indices
     INTEGER I_VAR_DCGRID, I_STATE_DCGRID                             ! local index of the DCGRID VAR/STATE
-    INTEGER IDXCONVERTER, DCNTRLTYPE, QCNTRLTYPE, ILIMITPRIORITY, i, idx_converter, idx_DCGRID
+    INTEGER DCNTRLTYPE, QCNTRLTYPE, ILIMITPRIORITY
+    INTEGER i, idx_converter, idx_DCGRID
     INTEGER, ALLOCATABLE :: temp_idx_converter(:), temp_idx_DCGRID(:)
 
     INTEGER istripvsc                                                ! disconnects unit and sets current injections to 0
     INTEGER dcontroltype_aux, qcontroltype_aux
     INTEGER NDCBUS, NDCLINES                                         ! # of buses and lines of the dc-grid
     INTEGER NDCBUS_PREVIOUS, NDCLINES_PREVIOUS
-    INTEGER IERR_REG
     INTEGER DCGRID_VAR_OFFSET
 
-    INTEGER, ALLOCATABLE :: CONVERTER_ACDC_BUS(:,:)                  ! ac and dc buses of each converter
+    INTEGER, ALLOCATABLE :: m_VSCACDCBUS(:,:)                  ! ac and dc buses of each converter
     INTEGER ierr
     REAL PI
     PARAMETER (PI=3.14159265358979)
@@ -182,7 +182,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     REAL, ALLOCATABLE :: v_udc0(:,:)
 
     REAL TAU
-    REAL KD_Pps, KD_Pudc, KD_Ips, KD_Iudc, KD_D2, KQ_Pqs, KQ_Iqs, KQ_Pus, KQ_Ius
+    REAL KD_Pps, KD_Pudc, KD_Ips, KD_Iudc, KQ_Pqs, KQ_Iqs, KQ_Pus, KQ_Ius
     REAL ICMAX
     REAL PSMAX, PSMIN, QSMAX, QSMIN
     REAL ALOSS, BLOSS, CLOSSRECT, CLOSSINV
@@ -201,8 +201,6 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     REAL fmodulationpwm, FMODULATIONPWMMAX
 
     REAL :: yetad, yndc, ymd, ynq, ymq
-
-    ! COMMON /svsconinternal/ I_STATE_DCGRID_G, aux_var_GLOBAL ! This allows saving the value of I_STATE_DCGRID_G between calls. Note that I_STATE_DCGRID_G takes the value of the first DCGRID model read.
 
     ! Parameter assignment
     ! --------------------
@@ -239,16 +237,16 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     TUDCMAX = CON(I_CON+23)              ! DC overvoltage protection delay
 
     ! ICONs
-    DCNTRLTYPE = ICON(I_ICON)          	! Ps-control: 1 , Udc-control: 2, Deltas-control: 3
+    DCNTRLTYPE = ICON(I_ICON)          	 ! Ps-control: 1 , Udc-control: 2, Deltas-control: 3
     QCNTRLTYPE = ICON(I_ICON+1)          ! Qs-control: 1 , Us-control: 2
     ILIMITPRIORITY = ICON(I_ICON+2)      ! Current limit: P-priority: 1, Q-priority: 2 and P-Q equal priority: 3 or any other integer
     NDCBUS = ICON(I_ICON+3)              ! Number of converters of the DC grid
     IDGRID = CHRICN(I_ICON+5)            ! DC grid identifier
     NDCLINES = ICON(I_ICON+4)
 
-    CALL REGISTER_DCG(IDGRID, NDCBUS, NDCLINES, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS, IERR_REG)
+    CALL REGISTER_DCG(IDGRID, NDCBUS, NDCLINES, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS, ierr)
 
-    IF (IERR_REG .NE. 0) THEN
+    IF (ierr .NE. 0) THEN
         WRITE (LPDEV,*) 'VSCGFL - ERROR: automatic DC-grid offset registration failed. IDGRID = ', IDGRID
         RETURN
     END IF
@@ -261,43 +259,41 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     END IF
 
     ! VARs
-    ps0 = VAR(I_VAR)                     ! Reference active power, coincides with load flow values.
-    qs0 = VAR(I_VAR+1)
-    icD_out = VAR(I_VAR+2)
-    icQ_out = VAR(I_VAR+3)
-    ps = VAR(I_VAR+4)                    ! Active model output power. 
-    qs = VAR(I_VAR+5)
-    icd0 = VAR(I_VAR+6)
-    icq0 = VAR(I_VAR+7)
-    icd = VAR(I_VAR+8)
-    icq = VAR(I_VAR+9)
-    istripvsc = VAR(I_VAR+10)
+    deltapsref = VAR(I_VAR)     ! From SPWDRD
+    deltaqsref = VAR(I_VAR+1)   ! From SQWDRD    
+    udcref = VAR(I_VAR+2)       ! To SPWDRD
+    udc = VAR(I_VAR+3)          ! To SPWDRD
+    pdc = VAR(I_VAR+4)          ! To DDCGRD/SDCGRD
+    
+    ps0 = VAR(I_VAR+5)          
+    qs0 = VAR(I_VAR+6)          
+    deltas0 = VAR(I_VAR+7)
+    icd0 = VAR(I_VAR+8)
+    icq0 = VAR(I_VAR+9)
 
-    udcref = VAR(I_VAR+13)
+    usref = VAR(I_VAR+10)
+    icdref = VAR(I_VAR+11)
+    icqref = VAR(I_VAR+12)
+    
+    ps = VAR(I_VAR+13)
+    qs = VAR(I_VAR+14)
+    icd = VAR(I_VAR+15)
+    icq = VAR(I_VAR+16)
 
-    usref = VAR(I_VAR+15)
-    antiwindupicd = VAR(I_VAR+17)
-    antiwindupicq = VAR(I_VAR+18)
-    ic_abs_puconv = VAR(I_VAR+19)
-    dcontroltype_aux = VAR(I_VAR+20)
-    qcontroltype_aux = VAR(I_VAR+21)
-    udc = VAR(I_VAR+22)
-    idc = VAR(I_VAR+23)
-    idc0 = VAR(I_VAR+24)
-    pdc = VAR(I_VAR+25)
-    deltas0 = VAR(I_VAR+26)
-    udc0 = VAR(I_VAR+27)
-    icdref = VAR(I_VAR+28)
-    deltapsref = VAR(I_VAR+29)
-    icqref = VAR(I_VAR+30)
-    deltaqsref = VAR(I_VAR+31)
-    fmodulationpwm = VAR(I_VAR+32)
-    counter_uvdc = VAR(I_VAR+33)
-    tinitial_uvdc = VAR(I_VAR+34)
-    counter_ovdc = VAR(I_VAR+35)
-    tinitial_ovdc = VAR(I_VAR+36)
-    idx_converter = VAR(I_VAR+37)       ! Added to store the local converter index within the DC grid.
+    istripvsc = VAR(I_VAR+17)
+    antiwindupicd = VAR(I_VAR+18)
+    antiwindupicq = VAR(I_VAR+19)
+    ic_abs_puconv = VAR(I_VAR+20)
+    dcontroltype_aux = VAR(I_VAR+21)
+    qcontroltype_aux = VAR(I_VAR+22)
 
+    fmodulationpwm = VAR(I_VAR+23)
+    counter_uvdc = VAR(I_VAR+24)
+    tinitial_uvdc = VAR(I_VAR+25)
+    counter_ovdc = VAR(I_VAR+26)
+    tinitial_ovdc = VAR(I_VAR+27)
+    idx_converter = VAR(I_VAR+28)
+    
     ! STATEs
     xd = STATE(I_STATE)                      ! icd
     xq = STATE(I_STATE+1)                    ! icq
@@ -320,7 +316,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     CALL DSRVAL('DELT', 1, DELTAT, IERR)
 
     ALLOCATE(v_udc0(NDCBUS,1))                ! allocate size
-    ALLOCATE(CONVERTER_ACDC_BUS(NDCBUS,2))
+    ALLOCATE(m_VSCACDCBUS(NDCBUS,2))
     
     icmaxpu = ICMAX*MBASE(I_MACH)/SBASE       ! current limit in system base
     psmaxpu = PSMAX/SBASE                     ! power limits in system base
@@ -372,10 +368,10 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
         ! ==============
 
         ! Get initial value of the DC voltage state from .txt files
-        CALL SUB_READDCBUS(v_udc0, CONVERTER_ACDC_BUS, IDGRID, NDCBUS)
+        CALL SUB_READDCBUS(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
         
         ! Get VAR index of the DCGRID governor-type model, since DCGRID now updates DC variables through VARs.
-		temp_idx_DCGRID = pack(CONVERTER_ACDC_BUS(:,2), CONVERTER_ACDC_BUS(:,2) /= -1)
+		temp_idx_DCGRID = pack(m_VSCACDCBUS(:,2), m_VSCACDCBUS(:,2) /= -1)
 		idx_DCGRID = temp_idx_DCGRID(1)
 
         ! Get DCGRID base index, supporting both STATE-based and VAR-based implementations.
@@ -421,7 +417,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
         pvsc = REAL(ec_phasor_RI*CONJG(ic_phasor_RI))
         pvsc = ps0 + REAL(zc)*(ic**2)
 
-        temp_idx_converter = pack([(i, i = 1, size(CONVERTER_ACDC_BUS(:,2)))], CONVERTER_ACDC_BUS(:,2) == NUMBUS(IB))
+        temp_idx_converter = pack([(i, i = 1, size(m_VSCACDCBUS(:,2)))], m_VSCACDCBUS(:,2) == NUMBUS(IB))
 		idx_converter = temp_idx_converter(1)
            
         ! DC-side voltage, current, power
@@ -491,12 +487,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 
         WRITE (LPDEV,*) 'VSCGFL - CASE 1: Converter ', idx_converter, ' at bus ', NUMBUS(IB), ' with id ', MACHID(I_MACH), ' initialized.'
         WRITE (LPDEV,*) 'VSCGFL - CASE 1: D-control: ', DCNTRLTYPE, ' Q-control: ', QCNTRLTYPE, ' I-limit priority: ', ILIMITPRIORITY
-        !WRITE (LPDEV,*) 'VSCGFL - CASE 1: us = ',us,' pu, ec = ',ec,' pu'
-		!WRITE (LPDEV,*) 'VSCGFL - CASE 1: ps = ',ps0,' pu, qs = ', qs0, ' pu'
-		!WRITE (LPDEV,*) 'VSCGFL - CASE 1: pc = ',pvsc,', pu ploss = ',ploss,' pu'
-		!WRITE (LPDEV,*) 'VSCGFL - CASE 1: udc = ',udc,' pu, pdc = ',-pdc,' pu'
-		!WRITE (LPDEV,*) 'VSCGFL - CASE 1: idc = ',idc, ' pu'
-		!WRITE (LPDEV,*) 'VSCGFL - CASE 1: icd = ',icd,' pu, icq = ',icq, ' pu'
+
 
     CASE (2)
 
@@ -612,7 +603,7 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
 		ANGLE(I_MACH) = deltac
         ETERM(I_MACH) = us
         PELEC(I_MACH) = ps                        ! in pu system rating
-        QELEC(I_MACH) = -us*icq                   ! in pu system rating
+        QELEC(I_MACH) = -qs                   ! in pu system rating
 
     CASE (4)
 
@@ -638,46 +629,40 @@ SUBROUTINE VSCGFL(I_MACH,I_SLOT)
     icq = xq
 
     ! VARs
-    VAR(I_VAR) = ps0              ! To SPWDRD (not really needed)
-    VAR(I_VAR+1) = qs0            ! To SQWDRD (not really needed)
-    VAR(I_VAR+26) = deltas0
-    VAR(I_VAR+6) = icd0
-    VAR(I_VAR+7) = icq0
+    VAR(I_VAR) = deltapsref      ! From SPWDRD
+    VAR(I_VAR+1) = deltaqsref    ! From SQWDRD    
+    VAR(I_VAR+2) = udcref        ! To SPWDRD
+    VAR(I_VAR+3) = udc           ! To SPWDRD
+    VAR(I_VAR+4) = pdc           ! To DDCGRD/SDCGRD
+    
+    VAR(I_VAR+5) = ps0           
+    VAR(I_VAR+6) = qs0          
+    VAR(I_VAR+7) = deltas0
+    VAR(I_VAR+8) = icd0
+    VAR(I_VAR+9) = icq0
 
-    VAR(I_VAR+13) = udcref        ! To SPWDRD
-    VAR(I_VAR+15) = usref
-    VAR(I_VAR+28) = icdref
-    VAR(I_VAR+30) = icqref
-    VAR(I_VAR+29) = deltapsref    ! From SPWDRD
-    VAR(I_VAR+31) = deltaqsref    ! From SQWDRD
+    VAR(I_VAR+10) = usref
+    VAR(I_VAR+11) = icdref
+    VAR(I_VAR+12) = icqref
+    
+    VAR(I_VAR+13) = ps
+    VAR(I_VAR+14) = qs
+    VAR(I_VAR+15) = icd
+    VAR(I_VAR+16) = icq
 
-    VAR(I_VAR+2) = icD_out
-    VAR(I_VAR+3) = icQ_out
-    VAR(I_VAR+4) = ps
-    VAR(I_VAR+5) = qs
-    VAR(I_VAR+8) = icd
-    VAR(I_VAR+9) = icq
+    VAR(I_VAR+17) = istripvsc
+    VAR(I_VAR+18) = antiwindupicd
+    VAR(I_VAR+19) = antiwindupicq
+    VAR(I_VAR+20) = ic_abs_puconv
+    VAR(I_VAR+21) = dcontroltype_aux
+    VAR(I_VAR+22) = qcontroltype_aux
 
-    VAR(I_VAR+10) = istripvsc
-    VAR(I_VAR+17) = antiwindupicd
-    VAR(I_VAR+18) = antiwindupicq
-    VAR(I_VAR+19) = ic_abs_puconv
-    VAR(I_VAR+20) = dcontroltype_aux
-    VAR(I_VAR+21) = qcontroltype_aux
-
-    VAR(I_VAR+25) = pdc                  ! To DCGRID
-    VAR(I_VAR+22) = udc                  ! To SPWDRD
-    VAR(I_VAR+23) = idc
-
-    VAR(I_VAR+27) = udc0
-    VAR(I_VAR+24) = idc0
-
-    VAR(I_VAR+32) = fmodulationpwm
-    VAR(I_VAR+33) = counter_uvdc
-    VAR(I_VAR+34) = tinitial_uvdc
-    VAR(I_VAR+35) = counter_ovdc
-    VAR(I_VAR+36) = tinitial_ovdc
-    VAR(I_VAR+37) = idx_converter               ! Added to store the local converter index for accessing the corresponding DC-grid variables. 
+    VAR(I_VAR+23) = fmodulationpwm
+    VAR(I_VAR+24) = counter_uvdc
+    VAR(I_VAR+25) = tinitial_uvdc
+    VAR(I_VAR+26) = counter_ovdc
+    VAR(I_VAR+27) = tinitial_ovdc
+    VAR(I_VAR+28) = idx_converter               
 
     ! STATEs
     STATE(I_STATE) = xd              ! icd

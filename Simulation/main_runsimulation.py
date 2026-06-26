@@ -21,7 +21,7 @@ import numpy as np
 str_pathinputfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC" # Path
 str_pathsimfiles = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC"  # Path
 str_lffile = r"kundur32_noAC_MTDCg.sav" # initial AC load flow"
-str_dyrfile = r"kundur_MTDCg.dyr" # initial AC load flow"
+str_dyrfile = r"kundur_MTDCg_VSCDRO.dyr" # initial AC load flow"
 str_dllfile = r"MTDCDyn.dll"
 
 # Solver parameters
@@ -97,15 +97,14 @@ if __name__ == "__main__":
     ierr, I_STATE_VSC = psspy.mdlind(12,"""14""",'GEN','STATE')
     ierr, I_VAR_VSC = psspy.mdlind(12,"""14""",'GEN','VAR')
     ierr, I_STATE_DCGRID = psspy.mdlind(12,"""14""",'GOV','STATE') 
-    # ierr, I_STATE_VSC = psspy.mdlind(9,"""14""",'GEN','STATE') 
-    # ierr, I_STATE_DCGRID = psspy.mdlind(7,"""14""",'GOV','STATE') 
     psspy.state_channel([-1, I_STATE_VSC], r"xecd")
     psspy.state_channel([-1, I_STATE_VSC+1], r"xecq")
-    # psspy.state_channel([-1, I_STATE_DCGRID], r"udc1")
-    # psspy.state_channel([-1, I_STATE_DCGRID+1], r"udc2")
-    psspy.var_channel([-1, I_VAR_VSC+22], r"udc")
-    psspy.var_channel([-1, I_VAR_VSC+23], r"idc")
-    psspy.var_channel([-1, I_VAR_VSC+25], r"pdc")
+    psspy.var_channel([-1, I_VAR_VSC+3], r"udc")
+    psspy.var_channel([-1, I_VAR_VSC+4], r"pdc")
+    psspy.var_channel([-1, I_VAR_VSC+15], r"icd")
+    psspy.state_channel([-1, I_STATE_DCGRID], r"udc1")
+    psspy.state_channel([-1, I_STATE_DCGRID+1], r"udc2")
+    psspy.state_channel([-1, I_STATE_DCGRID+2], r"udc3")
 
     # Add user-defined dynamic model
     psspy.addmodellibrary(str_pathdllfile)
@@ -135,9 +134,9 @@ if __name__ == "__main__":
     v_idxefd = range(4*NMACHINES,5*NMACHINES)
     v_idxpmech = range(5*NMACHINES,6*NMACHINES)
     v_idxspeed = range(6*NMACHINES,7*NMACHINES)
-    v_idxvscstates = range(7*NMACHINES,7*NMACHINES+2) 
-    # v_idxdcgridstates = range(7*NMACHINES+2,7*NMACHINES+4) 
+    v_idxvscstates = range(7*NMACHINES,7*NMACHINES+2)  
     v_idxvscvars = range(7*NMACHINES+2,7*NMACHINES+5) 
+    v_idxdcgridstates = range(7*NMACHINES+5,7*NMACHINES+8)
 
     fontP = FontProperties()
     fontP.set_size('small')
@@ -155,7 +154,7 @@ if __name__ == "__main__":
     for imach in v_idxpelec:
         axs[0].plot(v_t,chandata[imach+1],linewidth=2,label=chanid.values()[imach+1]) 
     axs[0].set_ylabel("Active power (pu)")
-    axs[0].set_ylim(3,8)
+    # axs[0].set_ylim(3,8)
     axs[0].legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
 
     for imach in v_idxqelec:
@@ -216,3 +215,15 @@ if __name__ == "__main__":
     fig.clf()
     plt.close(fig)
 
+    # Figure with two subplots: VSC states and currents
+    fig, axs = plt.subplots()
+    for ix in v_idxdcgridstates:
+        axs.plot(v_t,chandata[ix+1],linewidth=2,label=chanid.values()[ix+1]) 
+    axs.set_ylabel("DC Grid states (pu)")
+    # axs.set_ylim(-0.1,1.2)
+    axs.legend(loc='upper right',fontsize=6,bbox_to_anchor=(1,1))
+
+    plt.savefig(os.path.join(str_pathsimfiles,"DCGrid.png"),bbox_inches="tight")
+    plt.show()
+    fig.clf()
+    plt.close(fig)

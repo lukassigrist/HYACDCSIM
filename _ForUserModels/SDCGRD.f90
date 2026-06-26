@@ -9,7 +9,7 @@
 !
 ! To reflect this static DC-grid representation, the model is named SDCGRD.
 	
-MODULE module_globalmatrices
+MODULE MOD_DCGRID
 
     IMPLICIT NONE
 
@@ -17,7 +17,7 @@ MODULE module_globalmatrices
     REAL, ALLOCATABLE :: C_GLOBAL(:,:), D_GLOBAL(:,:)
 
     ! Stores the VAR index of each converter. This must be INTEGER because it is used as an array index.
-    INTEGER, ALLOCATABLE :: I_VAR_SVSCON_GLOBAL(:,:)
+    INTEGER, ALLOCATABLE :: I_VARCONV_GLOBAL(:,:)
 
     INTEGER :: aux_var_GLOBAL = 0
 
@@ -135,7 +135,7 @@ CONTAINS
         CALL GROW_REAL2D(D_GLOBAL, NTOTSTATES_AUTO, NTOTDCBUS_AUTO, IERR_MEM)
         IF (IERR_MEM .NE. 0) RETURN
 
-        CALL GROW_INT2D(I_VAR_SVSCON_GLOBAL, NTOTDCBUS_AUTO, 1, IERR_MEM)
+        CALL GROW_INT2D(I_VARCONV_GLOBAL, NTOTDCBUS_AUTO, 1, IERR_MEM)
         IF (IERR_MEM .NE. 0) RETURN
 
         CALL GROW_INT2D(CONVERTER_ACDC_BUS_GLOBAL, NTOTDCBUS_AUTO, 2, IERR_MEM)
@@ -289,13 +289,13 @@ CONTAINS
 
     END SUBROUTINE GROW_INT2D
 
-END MODULE module_globalmatrices
+END MODULE MOD_DCGRID
 
 
 SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 
 	! for the global variables (matrices)
-	USE module_globalmatrices
+	USE MOD_DCGRID
 	USE MOD_READHYADCSIM
 	INCLUDE 'COMON4.INS'
 	IMPLICIT none
@@ -305,7 +305,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 	INTEGER I_ICON, I_CON, I_STATE, I_VAR
 	INTEGER NDCBUS, NDCLINES, NPOLES									! number of DC buses, lines, poles
 	INTEGER NDCBUS_PREVIOUS, NDCLINES_PREVIOUS	                        ! automatically calculated offsets for DC buses and lines
-	INTEGER, ALLOCATABLE :: I_VAR_SVSCON(:,:) 							! array position of the converters
+	INTEGER, ALLOCATABLE :: I_VARCONV(:,:) 							! array position of the converters
 	INTEGER, ALLOCATABLE :: CONVERTER_ACDC_BUS(:,:) 	                ! ac and dc buses of each converter
 	INTEGER i,j
     INTEGER IERR_REG, IERR_MEM
@@ -331,7 +331,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 	REAL, ALLOCATABLE :: x(:,:), d_x(:,:), u(:,:), y(:,:)				! x = [udc, icc], u = idc, y = x
 
     !Related to DC power flow (in case 3) 
-    INTEGER, PARAMETER :: max_iter=10
+    INTEGER :: MAX_ITER
     Real, PARAMETER :: tol_dc=1.0d-6
     INTEGER :: ii, jj, ll, iter_dc, from_bus, to_bus
     Real :: sumYdc
@@ -345,11 +345,10 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
     INTEGER, ALLOCATABLE :: ipiv_active(:)
     REAL :: sumYdc_active
     INTRINSIC :: ABS, MAX, MAXVAL
-    REAL :: epsU
+    REAL, PARAMETER :: epsU=0.0000000001
 
 	! Indexes
 	I_CON=STRTIN(1,I_SLOT)
-	!I_STATE=STRTIN(2,I_SLOT)           ! I_STATE is no longer needed since MODE 2 state-derivative calculations have been removed.
 	I_VAR=STRTIN(3,I_SLOT)
 	I_ICON=STRTIN(4,I_SLOT)
    
@@ -358,18 +357,19 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 	NDCLINES = ICON(I_ICON+1) 			! number of DC lines of the ith MTDC
 	NPOLES = ICON(I_ICON+2) 			! number of poles of each converter
 	IDGRID = CHRICN(I_ICON+3)
+	MAX_ITER = ICON(I_ICON+4)			! max number of DC load flow iteration
 
     ! Automatic calculation of NDCBUS_PREVIOUS and NDCLINES_PREVIOUS
 	
     CALL REGISTER_DCG(IDGRID, NDCBUS, NDCLINES, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS, IERR_REG)
 
 	IF (IERR_REG .NE. 0) THEN
-		WRITE (LPDEV,*) 'DCGRID - ERROR: automatic DC-grid offset registration failed. IDGRID = ', IDGRID, ' IERR_REG = ', IERR_REG
+		WRITE (LPDEV,*) 'SDCGRD - ERROR: automatic DC-grid offset registration failed. IDGRID = ', IDGRID, ' IERR_REG = ', IERR_REG
 		RETURN
 	END IF
 
 	! Allocate matrices
-	ALLOCATE(I_VAR_SVSCON(NDCBUS,1))
+	ALLOCATE(I_VARCONV(NDCBUS,1))
 	ALLOCATE(CONVERTER_ACDC_BUS(NDCBUS,2))
 	ALLOCATE(Ydc(NDCBUS,NDCBUS))
 	ALLOCATE(Zdc(NDCBUS,NDCBUS))
@@ -404,16 +404,11 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 	ALLOCATE(Pdc(NDCBUS,1))
 	ALLOCATE(Icc(NDCLINES,1))
 
-	!ALLOCATE(x(NDCBUS+NDCLINES,1))               ! x is no longer allocated since MODE 2 state-derivative calculations have been removed.
-	!ALLOCATE(d_x(NDCBUS+NDCLINES,1))             ! d_x is no longer allocated since MODE 2 state-derivative calculations have been removed.
 	ALLOCATE(u(NDCBUS,1))
 	ALLOCATE(y(NDCBUS+NDCLINES,1))
     
 	! VARs assignment
-	DO i=1,(NDCBUS+NDCLINES) 
-	!	x(i,1) = STATE(I_STATE + i - 1)           ! x is no longer allocated since MODE 2 state-derivative calculations have been removed.
-	!	d_x(i,1) = DSTATE(I_STATE + i - 1)        ! d_x is no longer allocated since MODE 2 state-derivative calculations have been removed.
-	  
+	DO i=1,(NDCBUS+NDCLINES)   
 		IF (i.LE.NDCBUS) THEN 
 			Pdc(i,1) = VAR(I_VAR + i - 1) 			                      ! DC power of converters (stored as VARs)
 			Idc(i,1) = VAR(I_VAR + NDCBUS - 1 + i )                       ! DC current of converters (stored as VARs)
@@ -443,12 +438,12 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 		CALL ENSURE_GLOBAL_STORAGE(IERR_MEM)
 
 		IF (IERR_MEM .NE. 0) THEN
-			WRITE (LPDEV,*) 'DCGRID - ERROR: global storage allocation failed. IDGRID = ', IDGRID, ' IERR_MEM = ', IERR_MEM
+			WRITE (LPDEV,*) 'SDCGRD - ERROR: global storage allocation failed. IDGRID = ', IDGRID, ' IERR_MEM = ', IERR_MEM
 			RETURN
 		END IF
 	  
 		! Read DC-grid data from .txt file
-		CALL SUB_READDCGRID(I_VAR_SVSCON, Udc_ini, Ydc, Zdc, Ac, Gdc, Cdc_inv, Rsdc, Rsdc_inv, Ldc_inv, I_MACH, CONVERTER_ACDC_BUS, IDGRID, NDCBUS, NDCLINES)
+		CALL SUB_READDCGRID(I_VARCONV, Udc_ini, Ydc, Zdc, Ac, Gdc, Cdc_inv, Rsdc, Rsdc_inv, Ldc_inv, I_MACH, CONVERTER_ACDC_BUS, IDGRID, NDCBUS, NDCLINES)
 
         READ(IDGRID, *) IDGRID_num ! Convert char to number
         DO i = 1, NDCBUS
@@ -507,13 +502,10 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 
 		C = I_sts ! identity: (NDCBUS+NDCLINES)x(NDCBUS+NDCLINES) 
 		CALL SUB_JZEROS(D, NDCBUS+NDCLINES, NDCBUS)
-
-		!Idc_ini = MATMUL(Ydc, Udc_ini) 						! Idc_ini = Ydc*Udc_ini where Udc_ini from file
-		!CALL SUB_MULTBT(Udc_ini, Idc_ini, Pdc_ini, NDCBUS, 1) 	! Pdc_ini = Udc_ini.*Idc_ini
 		
 		DO i=1,NDCBUS
 		    IF (CONVERTER_ACDC_BUS(i,2) .NE. -1.0) THEN
-		       Pdc_ini(i,1) = VAR(I_VAR_SVSCON(i,1) + 25) 			! DC-power from each converter model 
+		       Pdc_ini(i,1) = VAR(I_VARCONV(i,1) + 4) 			! DC-power from each converter model 
 		    ELSE
 		       Pdc_ini(i,1) = 0.0   ! No converter on this DC bus
 		    END IF   
@@ -534,7 +526,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
         CALL SUB_LOCALTOGLOBAL(Ac, Ac_GLOBAL, NDCBUS, NDCLINES, SIZE(Ac_GLOBAL,1), SIZE(Ac_GLOBAL,2), NDCBUS_PREVIOUS, NDCLINES_PREVIOUS)
 
 		DO i = 1,NDCBUS
-			I_VAR_SVSCON_GLOBAL(NDCBUS_PREVIOUS+i,1) = I_VAR_SVSCON(i,1)
+			I_VARCONV_GLOBAL(NDCBUS_PREVIOUS+i,1) = I_VARCONV(i,1)
 		END DO
 		
 		! Initialization
@@ -544,52 +536,13 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 		Pdc = Pdc_ini
 		Icc = Icc_ini
 
-		! State assignment is disabled because MODE 2 state-derivative calculations have been removed. 
-		! states
-		!DO i=1,NDCBUS
-		!	x(i,1) = Udc(i,1)
-		!END DO
-		  
-		!DO i=1,NDCLINES
-		!	x(NDCBUS+i,1) = Icc(i,1)
-		!END DO
-
-		!DO i = 1, NDCBUS+NDCLINES
-    	!	STATE(I_STATE+i-1) = x(i,1)
-		!END DO
-
-		! Input/output calculations are now handled explicitly in CASE 3.  
-		! inputs
-		!u = Idc
-		  
-		! outputs
-		!y = MATMUL(C,x) + MATMUL(D,u) ! y = x
 		  
 		! report mode 
-		WRITE (LPDEV,*) 'DCGRID - CASE 1: DC grid at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH),' initialized.'
-		!WRITE (LPDEV,*) 'DCGRID - CASE 1: Pdc_ini = ',Pdc
-		!WRITE (LPDEV,*) 'DCGRID - CASE 1: Udc_ini = ',Udc
-		!WRITE (LPDEV,*) 'DCGRID - CASE 1: Idc_ini = ',Idc
-		!WRITE (LPDEV,*) 'DCGRID - CASE 1: Icc_ini = ',Icc
+		WRITE (LPDEV,*) 'SDCGRD - CASE 1: DC grid at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH),' initialized.'
  
 	CASE (2)
 
         ! CASE 2 is kept inactive; DC grid variables are updated using the DC power-flow formulation in CASE 3 instead of state derivatives.
-		! Compute derivatives
-		! ===================
-		! u = idc = pdc/uc (where pdc comes from converter) 
-		! x = [udc;icc]: states
-		! y = x
-
-		!CALL SUB_JZEROS(D, NDCBUS+NDCLINES, NDCBUS)
-
-		!u = Idc  
-		
-		!d_x = MATMUL(A,x) + MATMUL(B,u) 		! derivatives
-
-		!WRITE (LPDEV,*) 'DCGRID - CASE 2: Idc = ',Idc
-		!WRITE (LPDEV,*) 'Time =', Time, 'DCGRID - CASE 2: Udc = ',x
-		!WRITE (LPDEV,*) 'Time =', Time, 'DCGRID - CASE 2: dUdc/dt = ',d_x
 	  	
 	CASE (3) 
         
@@ -598,7 +551,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
         CALL SUB_GLOBALTOLOCAL(Ac, Ac_GLOBAL, NDCBUS, NDCLINES, SIZE(Ac_GLOBAL,1), SIZE(Ac_GLOBAL,2), NDCBUS_PREVIOUS, NDCLINES_PREVIOUS)
 
         DO i = 1, NDCBUS
-		    I_VAR_SVSCON(i,1) = I_VAR_SVSCON_GLOBAL(NDCBUS_PREVIOUS + i, 1)
+		    I_VARCONV(i,1) = I_VARCONV_GLOBAL(NDCBUS_PREVIOUS + i, 1)
         END DO
         
 		READ(IDGRID, *) IDGRID_num ! Convert char to number
@@ -609,16 +562,14 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 
         DO i = 1, NDCBUS
             IF (CONVERTER_ACDC_BUS(i,2) .NE. -1.0) THEN
-                Pdc(i,1) = VAR(I_VAR_SVSCON(i,1) + 25)
+                Pdc(i,1) = VAR(I_VARCONV(i,1) + 4)
             ELSE
                 Pdc(i,1) = 0.0
             END IF
         END DO
         
 		! DC power-flow solution: converter powers are used as inputs, and DC bus voltages and line currents are updated algebraically.
-		! DC power-flow formulation used instead of the previous state-derivative approach in CASE 2.
         i_slack = 0
-		epsU = 0.0000000001
 
         DO i = 1, NDCBUS
             IF (CONVERTER_ACDC_BUS(i,2) .NE. -1.0 .AND. ABS(Pdc(i,1)) .GE. 0.0000001) THEN
@@ -630,7 +581,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 		100 CONTINUE
 
 		IF (i_slack .EQ. 0) THEN
-            WRITE (LPDEV,*) 'DCGRID - ERROR: No slack bus found (no converter bus).'
+            WRITE (LPDEV,*) 'SDCGRD - ERROR: No slack bus found (no converter bus).'
             RETURN
         END IF
 		
@@ -661,7 +612,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
         	END DO
     	END DO
 
-        DO iter_dc = 1, max_iter
+        DO iter_dc = 1, MAX_ITER
         	DO i = 1, n_active
 			    ii = active_bus(i)
             	F_active(i,1) = 0.0
@@ -673,7 +624,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
 				F_active(i,1) = F_active(i,1) + Ydc(ii, i_slack) * Udc(i_slack,1) 
 
                 IF (ABS(Udc_active(i,1)) .LT. epsU) THEN
-				    WRITE(LPDEV,*) 'DCGRID - ERROR: Udc too small at bus ', active_bus(i), '  Udc=', Udc_active(i,1)
+				    WRITE(LPDEV,*) 'SDCGRD - ERROR: Udc too small at bus ', active_bus(i), '  Udc=', Udc_active(i,1)
                     RETURN
 				END IF
 
@@ -686,7 +637,7 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
             DO i = 1, n_active
 
 			    IF (ABS(Udc_active(i,1)) .LT. epsU) THEN
-				    WRITE(LPDEV,*) 'DCGRID - ERROR: Udc too small at bus ', active_bus(i), '  Udc=', Udc_active(i,1)
+				    WRITE(LPDEV,*) 'SDCGRD - ERROR: Udc too small at bus ', active_bus(i), '  Udc=', Udc_active(i,1)
 				    RETURN
 				END IF	
 
@@ -712,14 +663,10 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
         	Udc_active(:,1) = Udc_active(:,1) + delta_Udc_active(:,1)
 
     	END DO
-
-		!WRITE (LPDEV,*) 'DCGRID - CASE 3: Did not converge (iter=', max_iter, ')'
-        
+       
 		GO TO 300
 
 		200 CONTINUE
-
-		!WRITE (LPDEV,*) 'DCGRID - CASE 3: Converged in ', iter_dc, ' iterations'
 
 		300 CONTINUE
 
@@ -763,7 +710,6 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
         
 		! Outputs
 		! =======
-		!CALL SUB_JZEROS(D, NDCBUS+NDCLINES, NDCBUS)
 
         ! Fill y: first voltages, then line currents
 		DO ii = 1, NDCBUS
@@ -773,21 +719,15 @@ SUBROUTINE SDCGRD(I_MACH,I_SLOT)
         	y(NDCBUS + ii, 1) = Icc(ii,1)
     	END DO
 
-		!CALL SUB_DIVTBT(Pdc, Udc, Idc, NDCBUS, 1) ! Idc = Pdc/Udc
-		!u = Idc
-		
-		!y = MATMUL(C,x) + MATMUL(D,u) 			! outputs y = x
-
 	CASE (4)
-		!NINTEG = MAX(NINTEG, I_STATE+NDCBUS+NDCLINES-1)
 	  
 	CASE (5)
 		! reporting mode
 
-		WRITE (LPDEV,*) 'DCGRID - ', 'CON', I_CON
-		WRITE (LPDEV,*) 'DCGRID - ', 'ICON', I_ICON
-		WRITE (LPDEV,*) 'DCGRID - ', 'VAR', I_VAR
-		WRITE (LPDEV,*) 'DCGRID - ', 'STATE', I_STATE
+		WRITE (LPDEV,*) 'SDCGRD - ', 'CON', I_CON
+		WRITE (LPDEV,*) 'SDCGRD - ', 'ICON', I_ICON
+		WRITE (LPDEV,*) 'SDCGRD - ', 'VAR', I_VAR
+		WRITE (LPDEV,*) 'SDCGRD - ', 'STATE', I_STATE
 
 	CASE DEFAULT
 		  

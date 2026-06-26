@@ -28,7 +28,7 @@ SUBROUTINE SQWDRD(I_MACH,I_SLOT)
 	REAL TF, TW, UAC_THRES, W_THRES ! CONs
 	REAL ADDQs_MAX_NOM, ADDQs_MIN_NOM, RAMP_QMAX_NOM ! CONs
 	REAL addqs_max, addqs_min, ramp_qmax ! CONs
-	REAL qs_ini, deltaw_ref, deltaw_bus, qs_ref, ew, us_ref, us! VARs
+	REAL deltaw_ref, deltaw_bus, ew, us_ref, us! VARs
 	REAL d_addqs_ref_supp, addqs_ref, addqs_ref_ac, addqs_ref_supp, addqs_ref_supp_previous
 	REAL w_fil, d_w_fil, xw, d_xw ! STATEs and derivatives
 	REAL DELTAT ! time step
@@ -68,10 +68,8 @@ SUBROUTINE SQWDRD(I_MACH,I_SLOT)
 
 
 	! VARs
-	qs_ini = VAR(I_VAR) 
 	deltaw_ref = VAR(I_VAR+1)
 	deltaw_bus = VAR(I_VAR+2)
-	qs_ref = VAR(I_VAR+3)
 	addqs_ref = VAR(I_VAR+4)
 	d_addqs_ref_supp = VAR(I_VAR+5)
 	us_ref = VAR(I_VAR+6)
@@ -116,9 +114,6 @@ SUBROUTINE SQWDRD(I_MACH,I_SLOT)
 			deltaw_ref = 0.0
 			deltaw_bus = deltaw_ref
 			w_fil = deltaw_ref
-
-			qs_ini = VAR(I_VARCONV+1) ! first variable form SVSCWI model
-			qs_ref = qs_ini
 
 			addqs_ref_ac = 0.0
 			addqs_ref_supp = 0.0
@@ -188,7 +183,7 @@ SUBROUTINE SQWDRD(I_MACH,I_SLOT)
 			  addqs_ref = 0.00
 			END IF
 
-			VAR(I_VARCONV+31) = addqs_ref ! put the REACTIVE power reference in the converter
+			VAR(I_VARCONV+1) = addqs_ref ! put the REACTIVE power reference in the converter
 
 		CASE (4) 
 
@@ -208,10 +203,8 @@ SUBROUTINE SQWDRD(I_MACH,I_SLOT)
 	! -------------------
 
 	! VARs
-	VAR(I_VAR) = qs_ini 
 	VAR(I_VAR+1) = deltaw_ref ! From WDELAY (else 0.0)
 	VAR(I_VAR+2) = deltaw_bus
-	VAR(I_VAR+3) = qs_ref
 	VAR(I_VAR+4) = addqs_ref 
 	VAR(I_VAR+5) = d_addqs_ref_supp
 	VAR(I_VAR+6) = us_ref
