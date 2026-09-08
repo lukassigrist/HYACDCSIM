@@ -49,9 +49,9 @@ from _PyModules import module_acdc
 # file name and paths
 str_lffile = r"kundur32_noAC.sav" # initial AC power flow"
 str_dyrfile = r"kundur.dyr" # initial AC power flow"
+str_MTDCdatafile = r"define_grids_mtdc.xls" # Path to the input VSCs data Excel file
 str_pathlffile = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC" # Path
 str_path4dynamics = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC" # Path
-str_MTDCdatafile = r"C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\define_grids_mtdc.xls" # Path to the input VSCs data Excel file
 
 sys.path.append(str_pathlffile)
 ##import define_grids_mtdc # MTDC grid definition (.py) - USER DEFINED
@@ -77,7 +77,8 @@ d_acdcoptions = dict(issetdynamicfiles=issetdynamicfiles,issavedclfresults=issav
     lftol=lftol,lfmaxiter=lfmaxiter,idconv=idconv,idowner=idowner)
 
 str_savfileorig = os.path.join(str_pathlffile,str_lffile)  # initial AC power flow
-str_dyrfileorig = os.path.join(str_pathlffile,str_dyrfile)  # initial AC power flow
+str_dyrfileorig = os.path.join(str_pathlffile,str_dyrfile)  # initial dyr file
+str_xlsfile = os.path.join(str_pathlffile,str_MTDCdatafile)  # initial Excel MTDC file
 
 str_pathdclfresults = str_pathlffile
 
@@ -88,7 +89,7 @@ if __name__ == "__main__":
 
     # run ACDC power flow
     [d_acdcoutput, success, it, k_int_ac, k_int_dc, k_int_dcslack, j_int_dcslack, MM_Pdc_bus, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus] = module_acdc.main_runacdclf(d_acdcoptions, 
-    str_savfileorig, str_pathdclfresults, str_MTDCdatafile)
+    str_savfileorig, str_pathdclfresults, str_xlsfile)
     
     # show power flow results if needed
     module_acdc.fun_showacdclfoutput(isprogress, issavedclfresults, str_pathdclfresults, d_acdcoutput)  

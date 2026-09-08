@@ -15,8 +15,9 @@
 ! 3. Excitation stabilizer models, 4. Excitation system models, 5. Turbine-governor models. Turbine governor, stabilizer
 ! and excitation limiter models have no initialization duties other than STATEs and VARs.
 ! 
-! This simple voltage source model, VOLSOU, is implemented as a coordinated-call generator model 
-! (IC = 1 and IT = 01) since ZSORCE is either the transformer impedance or very small (0.001 pu) if a transformer is explicitely modelled. 
+! This simple voltage source model is implemented as a coordinated-call generator model 
+! (IC = 1 and IT = 01) since hard current limits is voltage dependent. 
+! ZSORCE is either the transformer impedance or very small (0.001 pu) if a transformer is explicitely modelled. 
  
 ! ======================================================================================
 ! MODULE DECLARATION
@@ -110,8 +111,6 @@ SUBROUTINE TSCDRO(I_MACH,I_SLOT)
 			ict_phasor_RI = (ect_phasor_RI - us_phasor_RI)/zc
             ISORCE(I_MACH) = ect_phasor_RI/zc			 
 			ss_phasor = us_phasor_RI*CONJG(ict_phasor_RI)
-
-			!IF ((IFLAG.GT.0).AND.(TIME.GT.-1.5)) WRITE (LPDEV,*) 'TSCGFO - CASE 3: ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_RI/reference_transf),real(ect_phasor_RI*CONJG(ict_phasor_RI))
 			
 		CASE DEFAULT
 
@@ -196,7 +195,7 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	CALL REGISTER_DCG(IDGRID, NDCBUS, NDCLINES, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS, ierr)
 
     IF (ierr .NE. 0) THEN
-        WRITE (LPDEV,*) 'VSCGFL - ERROR: automatic DC-grid offset registration failed. IDGRID = ', IDGRID
+        WRITE (LPDEV,*) 'VSCDRO - ERROR: automatic DC-grid offset registration failed. IDGRID = ', IDGRID
         RETURN
     END IF
 
@@ -221,7 +220,7 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	QCMIN = CON(I_CON+14) 			! Minimum reactive power (e.g., -0.1 pu)
 	ALOSS = CON(I_CON+15) 		! constant converter loss coefficient (MW): ploss = alosspu + blosspu*ict + c*ict^2
 	BLOSS = CON(I_CON+16) 		! linear converter loss coefficient (kV): ploss = alosspu + blosspu*ict + c*ict^2
-	BLOSS = CON(I_CON+17) 	! rectifier quadratic converter loss coefficient (ohm): ploss = alosspu + blosspu*ict + c*ict^2
+	CLOSSRECT = CON(I_CON+17) 	! rectifier quadratic converter loss coefficient (ohm): ploss = alosspu + blosspu*ict + c*ict^2
 	CLOSSINV = CON(I_CON+18) 	! constant converter loss coefficient (ohm): ploss = alosspu + blosspu*ict + c*ict^2
 	ICMAXIN = CON(I_CON+19) 		! maximum instantaneous current (pu)
     ECMAX = CON(I_CON+20) 		    ! maximum voltage (pu)
@@ -330,8 +329,6 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	ictd = REAL(ict_phasor_dq)
 	ictq = AIMAG(ict_phasor_dq)
 
-	! IF ((TIME.GT.-1.5)) WRITE (LPDEV,*) 'VSCGFO - CASE ',MODE ,': ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_dq),pct
-
 	SELECT CASE (MODE)
 
 		CASE (1) 
@@ -361,7 +358,7 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 			END IF    
 			
 			IF ((I_VAR_DCGRID.LE.0).AND.(I_STATE_DCGRID.LE.0)) THEN
-				WRITE (LPDEV,*) 'VSCGFL - CASE 1: No DCGRID VAR or STATE at bus ', NUMBUS(IB), ' with id ', MACHID(I_MACH), '.'
+				WRITE (LPDEV,*) 'VSCDRO - CASE 1: No DCGRID VAR or STATE at bus ', NUMBUS(IB), ' with id ', MACHID(I_MACH), '.'
 
 			ELSE IF ((I_VAR_DCGRID_G.LT.0).AND.(I_STATE_DCGRID_G.LT.0)) THEN
 				I_STATE_DCGRID_G = I_STATE_DCGRID   ! Stored DCGRID STATE base index.
@@ -394,7 +391,7 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, alosspu, blosspu, clossinvpu, clossrectpu)
 			pdc = -(pct + ploss)
 			ydc = -pdc
-			IF (I_STATE_DCGRID.GT.0) THEN
+			IF (I_STATE_DCGRID.GT.0).or.(I_VAR_DCGRID.GT.0) THEN
 				udc = v_udc0(idx_converter,1) 	! extract initial dc voltage value if any DC grid model
 			ELSE
 				udc = 1.0
@@ -450,9 +447,9 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 			CALL SUB_FIRSTORDERWINDUP(xec,xec,d_xec,deltaec,1,-1,DELTAT,TAU,10e9,-10e9)
 			
 			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized. Initial conditions of states K+5 to K+8 might be suspect.'  
-			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': pct = ',pct,', qct = ',qct,', udc = ',udcref
-			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': xec = ',xec,', xdelta = ',xdelta,', xdc = ',xdc
-			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': deltap = ',deltap,', dw = ',dw,', deltaq = ',deltaq,', deltaec = ',deltaec
+			!WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': pct = ',pct,', qct = ',qct,', udc = ',udcref
+			!WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': xec = ',xec,', xdelta = ',xdelta,', xdc = ',xdc
+			!WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': deltap = ',deltap,', dw = ',dw,', deltaq = ',deltaq,', deltaec = ',deltaec
 			EFD(I_MACH) = ectref
             SPEED(I_MACH) = dw
             ANGLE(I_MACH) = xdelta*180/PI
@@ -523,18 +520,6 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
             yqmax1 = MIN(yqmax1,0.0)
             yqmax2 = MAX(yqmax2,0.0)
 			CALL SUB_FIRSTORDERWINDUP(xec,xec,d_xec,deltaec,3,-1,DELTAT,TAU,10e9,-10e9)
-
-			! ect_phasor_dq = CMPLX(xec,0.0)
-
-            ! RI -> dq reference system transformation: xRI = reference_transf*xdq		
-	        ! reference_transf = CMPLX(COS(xdelta),SIN(xdelta))
-			
-			! Hard current limit approximation (should be actually placed in the network solution model due to the voltage dependency)	
-			! ict_phasor_dq = (ect_phasor_dq - us_phasor_RI/reference_transf)/zc
-			! CALL SUB_ICMAXLIMITSECREF(ect_phasor_dq, ict_phasor_dq, (us_phasor_RI/reference_transf), ILIMITPRIORITY, icmaxsspu, zc)		
-			! ect_phasor_RI = ect_phasor_dq*reference_transf
-            ! ISORCE(I_MACH) = ect_phasor_RI/zc       
-
 			
             EFD(I_MACH) = xec
             SPEED(I_MACH) = dw
@@ -545,7 +530,7 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 
 			! Update number of STATEs.
 			! ========================
-			NINTEG = MAX(NINTEG,I_STATE+12)
+			NINTEG = MAX(NINTEG,I_STATE+8)
 
 		CASE (5)
 			! reporting mode

@@ -69,7 +69,7 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 	ADDPs_MAX_NOM = CON(I_CON+8) ! Pmax (p.u-nom)
 	ADDPs_MIN_NOM = CON(I_CON+9) ! Pmin (p.u-nom)
 	RAMP_PMAX_NOM = CON(I_CON+10) ! maximum active power derivative (p.u/s)
-	BP_ERIK_NOM = CON(I_CON+11) ! maximum active power derivative (p.u/s)
+	BP_ERIK_NOM = CON(I_CON+11) ! maximum active power (p.u)
 
 	! VARs  
 	deltaw_ref = VAR(I_VAR+1)

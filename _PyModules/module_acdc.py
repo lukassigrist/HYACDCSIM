@@ -17,8 +17,8 @@ The module contains the following functions:
 - fun_setinitialvaluesacdclf: initialize sequential AC/DC power flow 
 - fun_setACsetpoints: set AC-side generator set points
 - fun_backwardcomputation: do a backward computation by explicitly representing the transformer and shunt branch, and then recompute the voltage and power set points at point f
-- fun_addnewelements: Add an artificial bus, a shunt filter, and a transformer filter, which are connected between the AC bus and the artificial bus
-- fun_relatedArtificialbuses: retrieve the artificial bus corresponding to a specific AC bus
+- fun_addnewelements: Add an virtual bus, a shunt filter, and a transformer filter, which are connected between the AC bus and the virtual bus
+- fun_relatedvirtualbuses: retrieve the virtual bus corresponding to a specific AC bus
 - fun_getACresults: extract results from the AC power flow run
 - fun_calculateVSCtransformerlosses: calculate the active and reactive power losses of VSC-connected transformers
 - fun_initializeDCfromAC: initialize DC-side variables from AC results
@@ -153,7 +153,7 @@ def main_runacdclf(d_acdcoptions, str_savfileorig, str_pathdclfresults, str_MTDC
     v_Qo0_pu = v_Qo_pu
     v_QLosses_tf0_pu = v_QLosses_tf_pu  # To control the variations in reactive power losses of the VSCs transformer based on potential changes in the current passing through it
     
-    l_artificialACbus = fun_addnewelements(nVSC, maxnACbus, DCSbase, idconv, m_converter, v_Uf0, v_Theta_f0, v_Qf_pu)      # Add new elements
+    l_virtualACbus = fun_addnewelements(nVSC, maxnACbus, DCSbase, idconv, m_converter, v_Uf0, v_Theta_f0, v_Qf_pu)      # Add new elements
     
     # DC slack indexes
     v_indexDCslack = np.where(m_dcbus[l_indexDCbusVSC, DC_TYPE] == 2)[0].tolist()
@@ -171,7 +171,7 @@ def main_runacdclf(d_acdcoptions, str_savfileorig, str_pathdclfresults, str_MTDC
         # ===================================================================
         
         # 1. Assign Po, Qo and Uf set points to AC-side converters (In this section, the converters are connected to the point f)     
-        fun_setACsetpoints(v_Uf, v_Theta_f, v_Po_pu, v_Uf0, v_Qo0_pu, DCSbase, m_converter, m_dcbus, idconv, idowner, isprerun, l_artificialACbus)
+        fun_setACsetpoints(v_Uf, v_Theta_f, v_Po_pu, v_Uf0, v_Qo0_pu, DCSbase, m_converter, m_dcbus, idconv, idowner, isprerun, l_virtualACbus)
          
         # 2. Solve AC power flow
         psspy.fnsl(
@@ -183,9 +183,9 @@ def main_runacdclf(d_acdcoptions, str_savfileorig, str_pathdclfresults, str_MTDC
         v_k_int_ac.append(psspy.iterat())
         
         # 3. Extract solutions of AC power flow 
-        [v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu] = fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_dcbus_f, idconv, l_artificialACbus)      
+        [v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu] = fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_dcbus_f, idconv, l_virtualACbus)      
         
-        [_, v_QLosses_tf_pu] = fun_calculateVSCtransformerlosses(l_artificialACbus, DCSbase) # Extraction of VSCs transformer losses after running the power flow in PSS/E.
+        [_, v_QLosses_tf_pu] = fun_calculateVSCtransformerlosses(l_virtualACbus, DCSbase) # Extraction of VSCs transformer losses after running the power flow in PSS/E.
         v_QLosses_corr_pu = v_QLosses_tf0_pu - v_QLosses_tf_pu  # Correction value for VSCs transformer reactive power losses compensation  
         v_Qo_pu = v_Qo_pu - v_QLosses_corr_pu                   # Updated value of Qo after addition correction value
         
@@ -223,7 +223,7 @@ def main_runacdclf(d_acdcoptions, str_savfileorig, str_pathdclfresults, str_MTDC
     # Output
     # =========================================================================
     d_acdcoutput = fun_getacdcoutput(v_If_phasor, v_Uf, v_Theta_f, v_Uc_phasor, v_Ic_phasor, v_Pc_pu, v_Qc_pu, v_PlossVSC,
-    DCSbase, m_dcbus_f, m_dcbranch, m_converter, l_artificialACbus, l_indexDCbusVSC)
+    DCSbase, m_dcbus_f, m_dcbranch, m_converter, l_virtualACbus, l_indexDCbusVSC)
 
     psspy.fnsl(
         options1=0, # disable tap stepping adjustment.
@@ -234,7 +234,7 @@ def main_runacdclf(d_acdcoptions, str_savfileorig, str_pathdclfresults, str_MTDC
     psspy.rawd_2(0,1,[1,1,1,0,0,0,0],0,str_rawfilemtdc) # save .raw
     psspy.save(str_savfilemtdc) # save .sav   
          
-    return d_acdcoutput, isconverged, it, k_int_ac, k_int_dc, k_int_dcslack, j_int_dcslack, v_mismatch_dc, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus
+    return d_acdcoutput, isconverged, it, k_int_ac, k_int_dc, k_int_dcslack, j_int_dcslack, v_mismatch_dc, l_MTDCgrids, l_indexDCbusVSC, l_virtualACbus
 
 def fun_readMTDCdata(str_MTDCdatafile, ACSbase):
 
@@ -377,7 +377,7 @@ def fun_setinitialvaluesacdclf(DCSbase, nDCbus, m_dcbus, nVSC):
     
     return v_Us, v_Theta_s, v_Ps_pu, v_Qs_pu, v_Pdc_pu, v_PlossVSC
    
-def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSbase, m_converter, m_dcbus, idconv, idowner, isprerun, l_artificialACbus):
+def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSbase, m_converter, m_dcbus, idconv, idowner, isprerun, l_virtualACbus):
 
     # get list of DC buses that have converters
     l_DCbusVSC = m_converter[:, DC_F_BUS].astype(int)
@@ -423,12 +423,13 @@ def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSb
     v_Qcmax = np.matrix(1.0*m_converter[:, FIL_QMAX])
     v_Qcmin = np.matrix(1.0*m_converter[:, FIL_QMIN])
     
-    # Converters that control Qs or Qf         
+    # Converters that control Qs or Qf   
+    Xsorce0 = 0.001     
     for i in range(0, nVSCpq):
 
         # Zsorce is only used in the dynamics  
         Rsorce_pu_conv = 0.0
-        Xsorce_pu_conv = 0.1 # any value since not used later on
+        Xsorce_pu_conv = Xsorce0 # any value since not used later on
             
         if not isprerun:
 
@@ -436,10 +437,10 @@ def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSb
 
             # Pf and Qf injection before the transformer (Qmin = Qmax = Qf)
             Rsorce_pu_conv = (v_Rc[l_indexDCtype1[i],0])*v_MbaseVSC[l_indexDCtype1[i],0]/DCSbase # p.u-machine
-            Xsorce_pu_conv = (v_Xc[l_indexDCtype1[i],0])*v_MbaseVSC[l_indexDCtype1[i],0]/DCSbase # p.u-machine
+            Xsorce_pu_conv = max(v_Xc[l_indexDCtype1[i],0],Xsorce_pu_conv)*v_MbaseVSC[l_indexDCtype1[i],0]/DCSbase # p.u-machine
             # Zsorce is only used in the dynamics
             
-            l_busACtype1[i] = fun_relatedArtificialbuses(l_artificialACbus, l_busACtype1[i])      # Replacement of the main bus with the virtual bus installed at point f
+            l_busACtype1[i] = fun_relatedvirtualbuses(l_virtualACbus, l_busACtype1[i])      # Replacement of the main bus with the virtual bus installed at point f
         
         # Include a new generator with Ps (or Pf) and Qs (or Qf)   
         psspy.plant_data(l_busACtype1[i],_i,[ v_Uref[l_indexDCtype1[i],0],_f]) # Control Us or Uf -- it is not necessary           
@@ -455,7 +456,7 @@ def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSb
     
         # Zsorce is only used in the dynamics  
         Rsorce_pu_conv = 0.0
-        Xsorce_pu_conv = 0.1
+        Xsorce_pu_conv = Xsorce0
 
         if not isprerun:
 
@@ -463,10 +464,10 @@ def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSb
 
             # Pf injection after the transformer and control voltage at point f
             Rsorce_pu_conv = (v_Rc[l_indexDCtype2[i],0])*v_MbaseVSC[l_indexDCtype2[i],0]/DCSbase # p.u-machine
-            Xsorce_pu_conv = (v_Xc[l_indexDCtype2[i],0])*v_MbaseVSC[l_indexDCtype2[i],0]/DCSbase # p.u-machine
+            Xsorce_pu_conv = max(v_Xc[l_indexDCtype2[i],0],Xsorce_pu_conv)*v_MbaseVSC[l_indexDCtype2[i],0]/DCSbase # p.u-machine
             # Zsorce is only used in the dynamics
             
-            l_busACtype2[i] = fun_relatedArtificialbuses(l_artificialACbus, l_busACtype2[i])      # Replacement of the main bus with the virtual bus installed at point f
+            l_busACtype2[i] = fun_relatedvirtualbuses(l_virtualACbus, l_busACtype2[i])      # Replacement of the main bus with the virtual bus installed at point f
 
         # Include a new generator with Ps (or Pf) and Us (or Uf)
         psspy.plant_data(l_busACtype2[i],_i,[ v_Uref0[l_indexDCtype2[i],0],_f]) # Control Us or Uf
@@ -481,7 +482,7 @@ def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSb
 
         # Zsorce is only used in the dynamics  
         Rsorce_pu_conv = 0.0
-        Xsorce_pu_conv = 0.1
+        Xsorce_pu_conv = Xsorce0
         
         if not isprerun:
 
@@ -489,10 +490,10 @@ def fun_setACsetpoints(v_Uref, v_Theta_ref, v_Pref_pu, v_Uref0, v_Qref0_pu, DCSb
             
             # Pf injection after the transformer and control voltage at point f
             Rsorce_pu_conv = (v_Rc[l_indexDCtype3[i],0])*v_MbaseVSC[l_indexDCtype3[i],0]/DCSbase # p.u-machine
-            Xsorce_pu_conv = (v_Xc[l_indexDCtype3[i],0])*v_MbaseVSC[l_indexDCtype3[i],0]/DCSbase # p.u-machine
+            Xsorce_pu_conv = max(v_Xc[l_indexDCtype3[i],0],Xsorce_pu_conv)*v_MbaseVSC[l_indexDCtype3[i],0]/DCSbase # p.u-machine
             # Zsorce is only used in the dynamics
 
-            l_busACtype3[i] = fun_relatedArtificialbuses(l_artificialACbus, l_busACtype3[i])      # Replacement of the main bus with the virtual bus installed at point f
+            l_busACtype3[i] = fun_relatedvirtualbuses(l_virtualACbus, l_busACtype3[i])      # Replacement of the main bus with the virtual bus installed at point f
 
         # Include a new generator with Ps (or Pf) and Us (or Uf)
         psspy.plant_data(l_busACtype3[i],_i,[ v_Uref0[l_indexDCtype3[i],0],_f]) # Control Us or Uf
@@ -567,28 +568,28 @@ def fun_addnewelements(nVSC, maxnACbus, DCSbase, idconv, m_converter, v_Uf0, v_T
     v_Rt = m_converter[:, FIL_RT]
     v_Xt = m_converter[:, FIL_XT]
 
-    # Add an artificial bus f, a shunt filter, and a transformer connected between the AC bus and the artificial bus f
-    l_artificialACbus = []
+    # Add an virtual bus f, a shunt filter, and a transformer connected between the AC bus and the virtual bus f
+    l_virtualACbus = []
     for i in range(0, nVSC):
     
         artificalACbus = maxnACbus + i + 1
 
-        ierr, VBASE_KV = psspy.busdat(int(m_converter[i, FIL_ACBUS]), 'BASE')   # Extracting the voltage base of buses at point s to be used in the artificial bus at point f
+        ierr, VBASE_KV = psspy.busdat(int(m_converter[i, FIL_ACBUS]), 'BASE')   # Extracting the voltage base of buses at point s to be used in the virtual bus at point f
         psspy.bus_data_4(artificalACbus, 0,[_i,_i,_i,_i],[VBASE_KV, v_Uf0[i], v_Theta_f0[i]*(180/pi),_f,_f,_f,_f],"BUS" + str(artificalACbus))
         psspy.shunt_data(artificalACbus, idconv,_i,[_f, v_Qf_pu[i]*DCSbase])
         psspy.two_winding_data_6(int(m_converter[i, FIL_ACBUS]),artificalACbus, idconv,[_i,_i,_i,_i,_i,_i,_i,_i, int(m_converter[i, FIL_ACBUS]),_i,_i,_i, 0,_i,_i,_i],[v_Rt[i], v_Xt[i],_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f],[_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f,_f],"","")
          
-        l_artificialACbus.append([int(m_converter[i, FIL_ACBUS]), artificalACbus])
+        l_virtualACbus.append([int(m_converter[i, FIL_ACBUS]), artificalACbus])
 
-    return l_artificialACbus
+    return l_virtualACbus
 
-def fun_relatedArtificialbuses(l_artificialACbus, l_busACtype):
+def fun_relatedvirtualbuses(l_virtualACbus, l_busACtype):
     
-    value = next((pair[1] for pair in l_artificialACbus if pair[0] == l_busACtype), None)
+    value = next((pair[1] for pair in l_virtualACbus if pair[0] == l_busACtype), None)
 
     return value
 
-def fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_dcbus_f, idconv, l_artificialACbus):
+def fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_dcbus_f, idconv, l_virtualACbus):
 
     # get list of DC buses that have converters
     l_DCbusVSC = m_converter[:, DC_F_BUS].astype(int)
@@ -620,7 +621,7 @@ def fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_
     # Converters that control Qf
     for i in range(0, nVSCpq):
         
-        l_busACtype1[i] = fun_relatedArtificialbuses(l_artificialACbus, l_busACtype1[i])    # Replacement of the main bus with the virtual bus installed at point f
+        l_busACtype1[i] = fun_relatedvirtualbuses(l_virtualACbus, l_busACtype1[i])    # Replacement of the main bus with the virtual bus installed at point f
         
         ierr, v_Uf[l_indexDCtype1[i],0] = psspy.busdat(l_busACtype1[i], 'PU')         # Voltage magnitude at ponit f [p.u.] (API)
         ierr, v_Theta_f[l_indexDCtype1[i],0] = psspy.busdat(l_busACtype1[i], 'ANGLE') # Voltage phase at ponit f [rad] (API)
@@ -633,7 +634,7 @@ def fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_
     # Converters that control Uf
     for i in range(0, nVSCpv):
 
-        l_busACtype2[i] = fun_relatedArtificialbuses(l_artificialACbus, l_busACtype2[i])    # Replacement of the main bus with the virtual bus installed at point f
+        l_busACtype2[i] = fun_relatedvirtualbuses(l_virtualACbus, l_busACtype2[i])    # Replacement of the main bus with the virtual bus installed at point f
 
         ierr, v_Uf[l_indexDCtype2[i],0] = psspy.busdat(l_busACtype2[i], 'PU')          # Voltage magnitude at ponit f [p.u.] (API)
         ierr, v_Theta_f[l_indexDCtype2[i],0] = psspy.busdat(l_busACtype2[i], 'ANGLE')  # Voltage phase at ponit f [rad] (API)
@@ -646,7 +647,7 @@ def fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_
     # ac-slack converter
     for i in range(0, nVSCslack):
 
-        l_busACtype3[i] = fun_relatedArtificialbuses(l_artificialACbus, l_busACtype3[i])    # Replacement of the main bus with the virtual bus installed at point f
+        l_busACtype3[i] = fun_relatedvirtualbuses(l_virtualACbus, l_busACtype3[i])    # Replacement of the main bus with the virtual bus installed at point f
 
         ierr, v_Uf[l_indexDCtype3[i],0] = psspy.busdat(l_busACtype3[i], 'PU')           # Voltage magnitude at ponit f [p.u.] (API)
         ierr, v_Theta_f[l_indexDCtype3[i],0] = psspy.busdat(l_busACtype3[i], 'ANGLE')   # Voltage phase at ponit f [rad] (API)
@@ -658,16 +659,16 @@ def fun_getACresults(v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu, DCSbase, m_converter, m_
     
     return v_Uf, v_Theta_f, v_Po_pu, v_Qo_pu
 
-def fun_calculateVSCtransformerlosses(l_artificialACbus, DCSbase):
+def fun_calculateVSCtransformerlosses(l_virtualACbus, DCSbase):
 
-    ACbuses_Artificialbuses_array = np.array(l_artificialACbus)
+    ACbuses_virtualbuses_array = np.array(l_virtualACbus)
     all_branches_strings = ['fromnumber', 'tonumber']                    
     ierr, idata = psspy.aflowint(-1, 1, 5, 1,all_branches_strings)     # Extraction of the list of sending (From) and receiving (To) buses
     
     from_buses = np.array(idata[0])  
     to_buses = np.array(idata[1])    
     
-    VSC_tr_branch_indices = np.concatenate([np.where((from_buses == branch[0]) & (to_buses == branch[1]))[0] for branch in ACbuses_Artificialbuses_array]) # Identification of the VSCs transformer branch number
+    VSC_tr_branch_indices = np.concatenate([np.where((from_buses == branch[0]) & (to_buses == branch[1]))[0] for branch in ACbuses_virtualbuses_array]) # Identification of the VSCs transformer branch number
     
     [ierr, rarray_PLosses_tf] = psspy.aflowreal(-1, 1, 1, 1, 'PLOSS')  # Active power losses of all branches [MW] (API)  
     [ierr, rarray_QLosses_tf] = psspy.aflowreal(-1, 1, 1, 1, 'QLOSS')  # Reactive power losses of all branches [MVAr] (API)  
@@ -795,7 +796,7 @@ def fun_calldclf(v_Uf, v_Theta_f, v_Uc_phasor, v_Po_pu, v_Qo_pu, v_Pc_pu, v_Qc_p
     
     return v_Po_no_current, k_int_dc, v_mismatch_dc, k_int_dcslack, j_int_dcslack, v_Po_pu, v_Pc_pu, v_Qc_pu, v_Pdc_pu, v_Uc_phasor, m_dcbus_f, m_dcbranch
   
-def fun_getacdcoutput(v_If_phasor, v_Uf, v_Theta_f, v_Uc_phasor, v_Ic_phasor, v_Pc_pu, v_Qc_pu, v_PlossVSC, DCSbase, m_dcbus_f, m_dcbranch, m_converter, l_artificialACbus, l_indexDCbusVSC):
+def fun_getacdcoutput(v_If_phasor, v_Uf, v_Theta_f, v_Uc_phasor, v_Ic_phasor, v_Pc_pu, v_Qc_pu, v_PlossVSC, DCSbase, m_dcbus_f, m_dcbranch, m_converter, l_virtualACbus, l_indexDCbusVSC):
 
     # Low pass filter current
     v_Bf = m_converter[:, FIL_BF]
@@ -834,7 +835,7 @@ def fun_getacdcoutput(v_If_phasor, v_Uf, v_Theta_f, v_Uc_phasor, v_Ic_phasor, v_
     v_Po_MW = m_dcbus_f[l_indexDCbusVSC,DC_PF]
     v_Qo_MVAr = m_dcbus_f[l_indexDCbusVSC,DC_QF]
     
-    [v_PLosses_tf_pu, v_QLosses_tf_pu] = fun_calculateVSCtransformerlosses(l_artificialACbus, DCSbase) # Extraction of VSCs transformer losses after running the power flow in PSS/E.
+    [v_PLosses_tf_pu, v_QLosses_tf_pu] = fun_calculateVSCtransformerlosses(l_virtualACbus, DCSbase) # Extraction of VSCs transformer losses after running the power flow in PSS/E.
 
     v_PLosses_tf_MW = (v_PLosses_tf_pu * DCSbase).reshape(-1)
     v_QLosses_tf_MVAr = (v_QLosses_tf_pu * DCSbase).reshape(-1)
@@ -843,10 +844,10 @@ def fun_getacdcoutput(v_If_phasor, v_Uf, v_Theta_f, v_Uc_phasor, v_Ic_phasor, v_
     v_Qs_MVAr = (v_Qo_MVAr - v_QLosses_tf_MVAr).reshape(-1)
 
     # Voltage setpoints
-    ACbuses_Artificialbuses_array = np.array(l_artificialACbus)
+    ACbuses_virtualbuses_array = np.array(l_virtualACbus)
     ierr, l_acbus = psspy.abusint(sid, flag, 'NUMBER')       # For determining AC buses and its bus No. (SID<0 & FLAG = 1: only in-service buses
     l_acbus = np.array(l_acbus).flatten()
-    t_AC_bus_indices = np.searchsorted(l_acbus, ACbuses_Artificialbuses_array[:, 0])   # Identification of the indices of AC buses connected to the VSCs
+    t_AC_bus_indices = np.searchsorted(l_acbus, ACbuses_virtualbuses_array[:, 0])   # Identification of the indices of AC buses connected to the VSCs
     
     v_Us = [v_Um_bus[i, 0] for i in t_AC_bus_indices]                          # Voltage magnitude at point s [p.u.]
     v_Theta_s = [(v_Theta_bus[i, 0] * (180/np.pi)) for i in t_AC_bus_indices]  # Voltage phase at point s [deg]
@@ -938,19 +939,19 @@ def fun_showacdclfoutput(isprogress, issavedclfresults, str_pathdclfresults, d_a
             np.savetxt(f_Rvoltage, np.concatenate((v_Uc, v_Theta_c*180/pi, v_Pc_pu*DCSbase, v_Qc_pu*DCSbase),axis=1), delimiter=',')
         f_Rvoltage.close()
 
-def main_setacdcdynamicdata(d_acdcoutput, str_dyrfileorig, str_path4dynamics, d_acdcoptions, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus):
+def main_setacdcdynamicdata(d_acdcoutput, str_dyrfileorig, str_path4dynamics, d_acdcoptions, l_MTDCgrids, l_indexDCbusVSC, l_virtualACbus):
 
     if d_acdcoptions["issetdynamicfiles"]==True:
     
         idconv = d_acdcoptions.get('idconv') 
         
         # write to text files DC grid data
-        fun_setDCnetworkdata(str_path4dynamics, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus)
+        fun_setDCnetworkdata(str_path4dynamics, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_virtualACbus)
        
         # update .dyr file with VSC and DC grid models
-        fun_updatedynamicfile(str_dyrfileorig, idconv, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus)
+        fun_updatedynamicfile(str_dyrfileorig, idconv, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_virtualACbus)
    
-def fun_updatedynamicfile(str_dyrfileorig, idconv, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus):
+def fun_updatedynamicfile(str_dyrfileorig, idconv, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_virtualACbus):
     """
     This function updates the existing .dyr file by adding MTDC network and converter and control models with pre-set parameters
     """
@@ -1001,7 +1002,7 @@ def fun_updatedynamicfile(str_dyrfileorig, idconv, d_acdcoutput, l_MTDCgrids, l_
         np.ones((ntotVSC,1))*float(idconv),m_dcbus[l_indexDCbusVSC,BUS_TYPE].reshape(-1,1), m_converter[v_indexACbus, FIL_A].reshape(-1,1),
         m_converter[v_indexACbus, FIL_B].reshape(-1,1), m_converter[v_indexACbus, FIL_CRECT].reshape(-1,1), m_converter[v_indexACbus, FIL_CINV].reshape(-1,1)),axis=1)
 
-    m_artificialACbus = np.array(l_artificialACbus)
+    m_virtualACbus = np.array(l_virtualACbus)
     
     # adding dynamic data iteratively
     iMTDC = 0
@@ -1028,7 +1029,7 @@ def fun_updatedynamicfile(str_dyrfileorig, idconv, d_acdcoutput, l_MTDCgrids, l_
             ivsc += 1
  
             with open(str_dyrfilemtdc,'a') as f_dyr:
-                str_dynmodelinstance = fun_setMTDCdyrdata(m_artificialACbus[ivsc, 1] if m_artificialACbus[ivsc, 0] == m_vscdynmodelbusparam[ivsc, 0] else None,
+                str_dynmodelinstance = fun_setMTDCdyrdata(m_virtualACbus[ivsc, 1] if m_virtualACbus[ivsc, 0] == m_vscdynmodelbusparam[ivsc, 0] else None,
                                                       m_vscdynmodelbusparam[ivsc,1], m_vscdynmodelbusparam[ivsc,2], m_vscdynmodelbusparam[ivsc,3], m_vscdynmodelbusparam[ivsc,4],
                                                       m_vscdynmodelbusparam[ivsc,5], m_vscdynmodelbusparam[ivsc,6], nDClinesi, nDCbusi, (idcbus-nDCbus_previous+1), idDCgrid, max_NS, max_NV,
                                                       ntotDCbus, ntotDClines, nDCbus_previous, nDClines_previous) # Updated to consider the bus number at point 'f'
@@ -1096,7 +1097,7 @@ def fun_write2txtfile(str_openformat, m_data, str_path, str_filename, str_idDCgr
         np.savetxt(f_file, m_data, fmt = str_writeformat, delimiter=',', header = str_idDCgridi, comments='')
     f_file.close()
 
-def fun_setDCnetworkdata(str_path4dynamics, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_artificialACbus):
+def fun_setDCnetworkdata(str_path4dynamics, d_acdcoutput, l_MTDCgrids, l_indexDCbusVSC, l_virtualACbus):
 
     # delete existing .txt files (if any)
     for file in os.listdir(str_path4dynamics):
@@ -1116,7 +1117,7 @@ def fun_setDCnetworkdata(str_path4dynamics, d_acdcoutput, l_MTDCgrids, l_indexDC
     l_nDCbus = []
     #l_nVSC = []
     nMTDCgrids = len(l_MTDCgrids)
-    m_artificialACbus = np.array(l_artificialACbus)
+    m_virtualACbus = np.array(l_virtualACbus)
     for i in range(0,nMTDCgrids):
         a_dcbus = l_MTDCgrids[i]["dcbus"]
         l_nDClines.append(len(l_MTDCgrids[i]["dcbranch"]))
@@ -1131,7 +1132,7 @@ def fun_setDCnetworkdata(str_path4dynamics, d_acdcoutput, l_MTDCgrids, l_indexDC
     v_Rsdc = m_dcbranch[:,DC_BR_R].reshape(nDClines)
     v_Ldc = m_dcbranch[:,DC_BR_L].reshape(nDClines)
     m_acdc_buses = np.column_stack((
-        m_dcbus[:,DC_BUS].astype(int),[m_artificialACbus[m_converter[:,FIL_DCBUS].astype(int) == int(dc_bus_id), 1][0]
+        m_dcbus[:,DC_BUS].astype(int),[m_virtualACbus[m_converter[:,FIL_DCBUS].astype(int) == int(dc_bus_id), 1][0]
                                        if np.any(m_converter[:,FIL_DCBUS].astype(int) == int(dc_bus_id)) else -1
                                        for dc_bus_id in m_dcbus[:,DC_BUS]])) # Changed by Saeed / For adding DC buses without a converter to create the required bus information file for dynamic simulation
    
