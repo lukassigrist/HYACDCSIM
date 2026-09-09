@@ -15,10 +15,10 @@ From the dynamic point of view, the dynamics of the multiple MTDC grids are mode
 This model finally creates the data files necessary for the dynamic simulations. In particular the following classe of files are generated:
 
 - .txt files containing the DC grid data (topology, R, L, C, etc.)
-- .dyr file, updated to include the models of the converters (SVSCON), their supplementary controls (SPWDRD o SQWDRD), and the grid (DCGRID)
+- .dyr file, updated to include the models of the converters (VSCGFL, etc.), their supplementary controls (SPWDRD o SQWDRD), and the grid (DCGRID)
 
 Inputs:
-- Static MTDC data (data in PYPOWER format - .py file)
+- Static MTDC data (data in PYPOWER format - .xls file)
 - Static power flow file (in PSS/e format - .sav file)
 
 Authors: 
