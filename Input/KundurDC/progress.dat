@@ -23,7 +23,7 @@ No power flow data changed for machine "14" at bus 5 [BUS5        220.00]
 
 Power flow data changed for machine "14" at bus 5 [BUS5        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.100000      ZX
+  0.100000E-03    0.100000E-02  ZX
 
 Power flow data changed for machine "14" at bus 5 [BUS5        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
@@ -52,7 +52,7 @@ No power flow data changed for machine "14" at bus 11 [BUS11       220.00]
 
 Power flow data changed for machine "14" at bus 11 [BUS11       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.100000      ZX
+  0.100000E-03    0.100000E-02  ZX
 
 Power flow data changed for machine "14" at bus 11 [BUS11       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
@@ -82,7 +82,7 @@ No power flow data changed for machine "14" at bus 6 [BUS6        220.00]
 
 Power flow data changed for machine "14" at bus 6 [BUS6        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.100000      ZX
+  0.100000E-03    0.100000E-02  ZX
 
 Power flow data changed for machine "14" at bus 6 [BUS6        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
@@ -112,7 +112,7 @@ No power flow data changed for machine "14" at bus 10 [BUS10       220.00]
 
 Power flow data changed for machine "14" at bus 10 [BUS10       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.100000      ZX
+  0.100000E-03    0.100000E-02  ZX
 
 Power flow data changed for machine "14" at bus 10 [BUS10       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
@@ -514,4 +514,4 @@ SWING BUS SUMMARY:
 
 Output completed
 
-Case saved in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC_MTDCg.sav on FRI, JUN 26 2026  18:10
+Case saved in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC_MTDCg.sav on WED, SEP 09 2026  15:54
