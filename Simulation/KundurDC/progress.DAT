@@ -1,0 +1,206 @@
+
+ TWO AREA MULTI-MACHINE TEST SYSTEM
+
+
+The Saved Case in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC_MTDCg.sav was saved on FRI, JUN 26 2026  18:10
+
+ ITER       DELTAP      BUS         DELTAQ      BUS        DELTA/V/      BUS       DELTAANG      BUS
+  0         0.0000(     10     )    0.0000(     11     )
+                                                            0.00000(     13     )   0.00000(      9     )
+  1         0.0000(      7     )    0.0000(      6     )
+                                                            0.00000(      9     )   0.00000(      9     )
+  2         0.0000(      9     )    0.0000(      5     )
+
+
+Reached tolerance in 2 iterations
+
+Largest mismatch:     -0.00 MW     -0.00 Mvar      0.00 MVA at bus 4 [BUS4        20.000]
+System total absolute mismatch:                    0.00 MVA
+
+SWING BUS SUMMARY:
+  BUS#-SCT X-- NAME --X BASKV      PGEN     PMAX    PMIN      QGEN     QMAX    QMIN
+     1     BUS1        20.000     688.9   9999.0 -9999.0     116.5   9999.0 -9999.0
+     3     BUS3        20.000     723.5   9999.0 -9999.0     229.0   9999.0 -9999.0
+
+Generator conversion completed using ZSORCE
+
+2 loads converted during this step
+
+2 of 2 loads converted
+Diagonals = 14   Off-diagonals = 12   Maximum size = 24
+
+14 diagonal and 12 off-diagonal elements
+
+ITER DELTAV/TOL X----------- AT BUS -----------X  REAL(DELTAV)  IMAG(DELTAV)
+   1     0.006      14     [BUS14       220.00]    0.5761E-07   -0.1469E-07
+
+Reached tolerance in 1 iterations
+
+Largest mismatch:     -0.00 MW      0.00 Mvar      0.00 MVA at bus 3 [BUS3        20.000]
+System total absolute mismatch:                    0.00 MVA
+Out of file data--switch to terminal input mode
+
+Generator models use:
+ CONS         1-    150
+ STATES       1-     54
+ VARS         1-    104
+ ICONS        1-     23
+
+Stabilizer models use:
+ CONS       151-    202
+ STATES      55-     62
+ VARS       105-    160
+ ICONS       24-     35
+
+Excitation System models use:
+ CONS       203-    298
+ STATES      63-     86
+ VARS       161-    220
+ ICONS       36-     47
+
+Turbine Governor models use:
+ CONS       299-    378
+ STATES      87-    122
+ VARS       221-    240
+ ICONS       48-     55
+
+
+SUMMARY OF MODELS READ:
+
+GENS:  GENROU
+          4
+
+EXSYS: EXST1
+          4
+
+GOVS:  IEEEG1
+          4
+
+USER:  USRMDL
+         14
+
+NEXT AVAILABLE ADDRESSES ARE:
+    CON   STATE     VAR    ICON
+    379     123     241      56
+
+Compile models not supplied by PSS/E and create user dll
+
+Channel output file is "C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\output.out"
+
+8 Output channels have been added
+
+
+Next available addresses are:
+  CHANNEL    VAR    ICON
+       9     241      56
+
+8 Output channels have been added
+
+
+Next available addresses are:
+  CHANNEL    VAR    ICON
+      17     241      56
+
+8 Output channels have been added
+
+
+Next available addresses are:
+  CHANNEL    VAR    ICON
+      25     241      56
+
+8 Output channels have been added
+
+
+Next available addresses are:
+  CHANNEL    VAR    ICON
+      33     241      56
+
+8 Output channels have been added
+
+
+Next available addresses are:
+  CHANNEL    VAR    ICON
+      41     241      56
+
+8 Output channels have been added
+
+
+Next available addresses are:
+  CHANNEL    VAR    ICON
+      49     241      56
+
+8 Output channels have been added
+
+
+Next available addresses are:
+  CHANNEL    VAR    ICON
+      57     241      56
+
+CHANNEL   57 WITH IDENTIFIER "XECD" ADDED
+
+CHANNEL   58 WITH IDENTIFIER "XECQ" ADDED
+
+CHANNEL   59 WITH IDENTIFIER "UDC" ADDED
+
+CHANNEL   60 WITH IDENTIFIER "PDC" ADDED
+
+CHANNEL   61 WITH IDENTIFIER "ICD" ADDED
+
+CHANNEL   62 WITH IDENTIFIER "UDC1" ADDED
+
+CHANNEL   63 WITH IDENTIFIER "UDC2" ADDED
+
+CHANNEL   64 WITH IDENTIFIER "UDC3" ADDED
+ibrary added:C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\MTDCDyn.dll
+
+14 diagonal and 12 off-diagonal elements
+VSCGFL - CASE 1: Converter  1  at bus  12  with id 14 initialized.
+VSCGFL - CASE 1: D-control:  1  Q-control:  1  I-limit priority:  1
+VSCDRO - CASE 1: Converter  3  at bus  13  with id 14
+ initialized. Initial conditions of states K+5 to K+8 might be suspect.
+VSCDRO - CASE 1: Converter  3  at bus  13  with id 14: pct =  2.012753 , qct =
+  0.1675777 , udc =  0.9973702
+VSCDRO - CASE 1: Converter  3  at bus  13  with id 14: xec =  1.009390 
+, xdelta =  -3.7517831E-02 , xdc =  2.012753
+VSCDRO - CASE 1: Converter  3  at bus  13  with id 14: deltap = 
+0.000000 , dw =  0.000000 , deltaq =  0.000000 , deltaec =  1.009390
+VSCGFL - CASE 1: Converter  1  at bus  14  with id 14 initialized.
+VSCGFL - CASE 1: D-control:  1  Q-control:  1  I-limit priority:  1
+VSCGFL - CASE 1: Converter  2  at bus  15  with id 14 initialized.
+VSCGFL - CASE 1: D-control:  1  Q-control:  1  I-limit priority:  1
+SPWDRD - CASE 1: MTDC at AC bus  12  with id 14 initialized.
+SPWDRD - CASE 1: MTDC at AC bus  13  with id 14 initialized.
+SPWDRD - CASE 1: MTDC at AC bus  14  with id 14 initialized.
+SPWDRD - CASE 1: MTDC at AC bus  15  with id 14 initialized.
+DDCGRD - CASE 1: DC grid at AC bus  12  with id 14 initialized.
+DDCGRD - CASE 1: DC grid at AC bus  14  with id 14 initialized.
+
+    PTI INTERACTIVE POWER SYSTEM SIMULATOR--PSS(R)E     FRI, SEP 04 2026   0:36
+ TWO AREA MULTI-MACHINE TEST SYSTEM
+
+
+INITIAL CONDITION LOAD FLOW USED 1 ITERATIONS
+
+----------------------------- MACHINE INITIAL CONDITIONS -----------------------------
+  BUS#-SCT X-- NAME --X BASKV ID  ETERM   EFD    POWER    VARS   P.F.  ANGLE   ID     IQ
+     1     BUS1        20.000 1  1.0300 1.9424  688.90  116.53 0.9860  43.21 0.6005 0.4555
+     2     BUS2        20.000 1  1.0100 1.9022  700.00   88.81 0.9920  39.81 0.6239 0.4618
+     3     BUS3        20.000 1  1.0300 2.1891  723.45  229.00 0.9534  39.97 0.6906 0.4395
+     4     BUS4        20.000 1  1.0100 2.2665  700.00  294.66 0.9217  24.30 0.7278 0.4104
+    12     BUS12       220.00 14 1.0140 0.0000 -202.35    7.64-0.9993 -10.78 0.0308-0.3982
+    13     BUS13       220.00 14 1.0049 1.0094  200.87    8.75 0.9991-123.16-0.3589-0.1770
+    14     BUS14       220.00 14 0.9987 0.0000 -202.69    7.81-0.9993 -17.71 0.0322-0.4049
+    15     BUS15       220.00 14 0.9736 0.0000  200.95    9.48 0.9989 -15.43 0.0368 0.4116
+
+ INITIAL CONDITIONS SUSPECT:
+     I   DSTATE(I)    STATE(I)     MODEL             STATE     BUS#-SCT X-- NAME --X BASKV  ID
+     39   0.20324       0.0000     VSCDRO             K+7        13     BUS13       220.00  14
+     40  -0.23676       0.0000     VSCDRO             K+8        13     BUS13       220.00  14
+
+Channel output file is "C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\output.out"
+
+Channel output file is "C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\output.out"
+
+REF at bus 3     [BUS3        20.000] machine "1") changed from 0.80551 to 0.65
+
+Channel output file is "C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Simulation\KundurDC\output.out"

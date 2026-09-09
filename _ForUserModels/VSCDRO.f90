@@ -15,15 +15,18 @@
 ! 3. Excitation stabilizer models, 4. Excitation system models, 5. Turbine-governor models. Turbine governor, stabilizer
 ! and excitation limiter models have no initialization duties other than STATEs and VARs.
 ! 
-! This simple voltage source model, VOLSOU, is implemented as a coordinated-call generator model 
-! (IC = 1 and IT = 01) since ZSORCE is either the transformer impedance or very small (0.001 pu) if a transformer is explicitely modelled. 
+! This simple voltage source model is implemented as a coordinated-call generator model 
+! (IC = 1 and IT = 01) since hard current limits is voltage dependent. 
+! ZSORCE is either the transformer impedance or very small (0.001 pu) if a transformer is explicitely modelled. 
  
 ! ======================================================================================
 ! MODULE DECLARATION
 ! ======================================================================================
 MODULE MOD_VSCDRO_INTERNAL
 	! Internal variables
-	INTEGER :: I_STATE_DCGRID_G = -1
+	! This stores the VAR/STATE index of the first DCGRID model found.
+    INTEGER :: I_VAR_DCGRID_G = -1
+    INTEGER :: I_STATE_DCGRID_G = -1
 END MODULE MOD_VSCDRO_INTERNAL      
 
 ! ==========================================================
@@ -62,8 +65,8 @@ SUBROUTINE TSCDRO(I_MACH,I_SLOT)
 	xdelta = STATE(I_STATE+1)
 
 	! ICONs
-	ISHARDCLIMIT = ICON(I_ICON+5) 		! Hard current limit
-	ILIMITPRIORITY = ICON(I_ICON+6) 	! Current limit priority
+	ISHARDCLIMIT = ICON(I_ICON) 		! Hard current limit
+	ILIMITPRIORITY = ICON(I_ICON+1) 	! Current limit priority
 
 	! CONs
 	ICMAXIN = CON(I_CON+19) 						! maximum instantaneous current (pu)
@@ -108,8 +111,6 @@ SUBROUTINE TSCDRO(I_MACH,I_SLOT)
 			ict_phasor_RI = (ect_phasor_RI - us_phasor_RI)/zc
             ISORCE(I_MACH) = ect_phasor_RI/zc			 
 			ss_phasor = us_phasor_RI*CONJG(ict_phasor_RI)
-
-			!IF ((IFLAG.GT.0).AND.(TIME.GT.-1.5)) WRITE (LPDEV,*) 'TSCGFO - CASE 3: ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_RI/reference_transf),real(ect_phasor_RI*CONJG(ict_phasor_RI))
 			
 		CASE DEFAULT
 
@@ -133,6 +134,7 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	USE MOD_PROTECTION 										! use module of protection functions
 	USE MOD_MISC 											! use module of miscellaneous functions
 	USE MOD_VSCDRO_INTERNAL									! use module for global VSCDRO-related variables
+	USE MOD_DCGRID, ONLY: REGISTER_DCG           			! use automatic DC-grid registration for offset calculation
 	INCLUDE 'COMON4.INS'									! common PSS/e variables and modules
 	IMPLICIT NONE
 	
@@ -140,10 +142,12 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	! -----------
 	INTEGER :: I_SLOT, I_MACH, I_VAR, I_CON, I_ICON, I_STATE	! PSS/e indices
 	INTEGER :: IB												! Bus index
-	INTEGER :: IDXCONVERTER, NDCBUS, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS
+	INTEGER :: NDCBUS, NDCLINES, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS
+	INTEGER :: DCGRID_VAR_OFFSET, i, idx_converter, idx_DCGRID
+	INTEGER, ALLOCATABLE :: temp_idx_converter(:), temp_idx_DCGRID(:)
 	INTEGER, ALLOCATABLE :: m_VSCACDCBUS(:,:) ! ac and dc buses of each converter
 
-    INTEGER :: ierr, I_STATE_DCGRID, ILIMITPRIORITY
+    INTEGER :: ierr, I_STATE_DCGRID, I_VAR_DCGRID, ILIMITPRIORITY, ISHARDCLIMIT
 		
 	REAL :: xec, xdelta, xdc, xp, xq, xpmax1, xpmax2, xqmax1, xqmax2
 	REAL :: d_xec, d_xdelta, d_xdc, d_xp, d_xq, d_xpmax1, d_xpmax2, d_xqmax1, d_xqmax2
@@ -161,8 +165,8 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
     COMPLEX ss_phasor, sct_phasor
 	COMPLEX	reference_transf
 
-	REAL :: TAU, MP, TP, MQ, TQ, KPDC, KIDC, PCMAX, PCMIN, QCMAX, QCMIN, ALOSS_MW, BLOSS_kV, CLOSS_RECT_Ohm, CLOSS_INV_Ohm, ICMAXIN, KPPMAX, KPIMAX, KQPMAX, KQIMAX, ECMAX, ECMIN
-	REAL :: mppu, mqpu, kpdcpu, kidcpu, pcmaxpu, pcminpu, qcmaxpu, qcminpu, aloss, bloss, c_inv, c_rect, icmaxinpu, kppmaxpu, kpimaxpu, kqpmaxpu, kqimaxpu
+	REAL :: TAU, MP, TP, MQ, TQ, KPDC, KIDC, PCMAX, PCMIN, QCMAX, QCMIN, ALOSS, BLOSS, CLOSSRECT, CLOSSINV, ICMAXIN, KPPMAX, KPIMAX, KQPMAX, KQIMAX, ECMAX, ECMIN
+	REAL :: mppu, mqpu, kpdcpu, kidcpu, pcmaxpu, pcminpu, qcmaxpu, qcminpu, alosspu, blosspu, clossinvpu, clossrectpu, icmaxinpu, kppmaxpu, kpimaxpu, kqpmaxpu, kqimaxpu
 
     REAL :: OMEGABASE, FBASE, PI, ZBASE
     PARAMETER (PI=3.14159265358979)
@@ -181,12 +185,22 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	I_ICON = STRTIN(4,I_SLOT)
 	
 	! ICONs
-	IDXCONVERTER = ICON(I_ICON) 		! absolute index number of all VSC
-	NDCBUS = ICON(I_ICON+1) 			! Number of converters of the DC grid
-	IDGRID = CHRICN(I_ICON+2)			! DC grid identifier
-	NDCBUS_PREVIOUS = ICON(I_ICON+3) 	! accumulated number of DC buses
-	NDCLINES_PREVIOUS = ICON(I_ICON+4) 	! accumulated numnber of DC lines
-	ILIMITPRIORITY = ICON(I_ICON+6) 	! Current limit priority
+	ISHARDCLIMIT = ICON(I_ICON) 		! Hard current limit
+	ILIMITPRIORITY = ICON(I_ICON+1) 	! Current limit priority
+	NDCBUS = ICON(I_ICON+2) 			! Number of converters of the DC grid
+	NDCLINES = ICON(I_ICON+3)			! Number of DC lines of the DC grid
+	IDGRID = CHRICN(I_ICON+4)			! DC grid identifier
+	
+
+	CALL REGISTER_DCG(IDGRID, NDCBUS, NDCLINES, NDCBUS_PREVIOUS, NDCLINES_PREVIOUS, ierr)
+
+    IF (ierr .NE. 0) THEN
+        WRITE (LPDEV,*) 'VSCDRO - ERROR: automatic DC-grid offset registration failed. IDGRID = ', IDGRID
+        RETURN
+    END IF
+
+    ! DCGRID VAR block order is: Pdc(NDCBUS), Idc(NDCBUS), Udc(NDCBUS), Icc(NDCLINES)
+    DCGRID_VAR_OFFSET = 3*NDCBUS_PREVIOUS + NDCLINES_PREVIOUS
 			
 	! CONs    
 	TAU = CON(I_CON) 				! Inverter time constant (e.g., 0.01 s)
@@ -204,30 +218,36 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
     KQIMAX = CON(I_CON+12)          ! Reactive power limiter integral gain (e.g., 10.0)
 	QCMAX = CON(I_CON+13) 			! Maximum reactive power (e.g., 0.1 pu)
 	QCMIN = CON(I_CON+14) 			! Minimum reactive power (e.g., -0.1 pu)
-	ALOSS_MW = CON(I_CON+15) 		! constant converter loss coefficient (MW): ploss = aloss + bloss*ict + c*ict^2
-	BLOSS_kV = CON(I_CON+16) 		! linear converter loss coefficient (kV): ploss = aloss + bloss*ict + c*ict^2
-	CLOSS_RECT_Ohm = CON(I_CON+17) 	! rectifier quadratic converter loss coefficient (ohm): ploss = aloss + bloss*ict + c*ict^2
-	CLOSS_INV_Ohm = CON(I_CON+18) 	! constant converter loss coefficient (ohm): ploss = aloss + bloss*ict + c*ict^2
+	ALOSS = CON(I_CON+15) 		! constant converter loss coefficient (MW): ploss = alosspu + blosspu*ict + c*ict^2
+	BLOSS = CON(I_CON+16) 		! linear converter loss coefficient (kV): ploss = alosspu + blosspu*ict + c*ict^2
+	CLOSSRECT = CON(I_CON+17) 	! rectifier quadratic converter loss coefficient (ohm): ploss = alosspu + blosspu*ict + c*ict^2
+	CLOSSINV = CON(I_CON+18) 	! constant converter loss coefficient (ohm): ploss = alosspu + blosspu*ict + c*ict^2
 	ICMAXIN = CON(I_CON+19) 		! maximum instantaneous current (pu)
     ECMAX = CON(I_CON+20) 		    ! maximum voltage (pu)
     ECMIN = CON(I_CON+21) 		    ! minimum voltage (pu)
 	
 	! VARs
-	pctref = VAR(I_VAR) 	
-	qctref = VAR(I_VAR+1) 
-	deltapctref = VAR(I_VAR+2)
-	deltaqctref = VAR(I_VAR+3)
-    ectref = VAR(I_VAR+4)
-	udcref = VAR(I_VAR+5)
+	deltapctref = VAR(I_VAR)          ! From SPWDRD
+	deltaqctref = VAR(I_VAR+1)        ! From SQWDRD
+	udcref = VAR(I_VAR+2)        	  ! To SPWDRD
+	udc = VAR(I_VAR+3)        		  ! To SPWDRD
+	pdc = VAR(I_VAR+4)        		  ! To DDCGRD/SDCGRD
 
-	ydc = VAR(I_VAR+6)
-	ypmax1 = VAR(I_VAR+7)
-	ypmax2 = VAR(I_VAR+8)
-	yqmax1 = VAR(I_VAR+9)
-	yqmax2 = VAR(I_VAR+10)
+	pctref = VAR(I_VAR+5)
+	qctref = VAR(I_VAR+6)
+	ectref = VAR(I_VAR+7)
+	ydc = VAR(I_VAR+8)
+	ypmax1 = VAR(I_VAR+9)
+	ypmax2 = VAR(I_VAR+10)
+	yqmax1 = VAR(I_VAR+11)
+	yqmax2 = VAR(I_VAR+12)
 
-	ictd = VAR(I_VAR+11)
-	ictq = VAR(I_VAR+12)
+	ictd = VAR(I_VAR+13)
+	ictq = VAR(I_VAR+14)
+	deltap = VAR(I_VAR+15)
+
+	idx_converter = VAR(I_VAR+16)
+
 	
 	! STATEs
 	xec = STATE(I_STATE)         
@@ -266,10 +286,11 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	qcminpu = QCMIN*MBASE(I_MACH)/SBASE
 	icmaxinpu = ICMAXIN*MBASE(I_MACH)/SBASE				
 	ZBASE = BASVLT(IB)**2/SBASE             ! AC-side Zbase in ohms
-	aloss = ALOSS_MW/SBASE                 
-	bloss = BLOSS_kV/SQRT(3.0)/BASVLT(IB)
-	c_rect = CLOSS_RECT_Ohm/ZBASE
-	c_inv = CLOSS_INV_Ohm/ZBASE
+	
+	alosspu = ALOSS*MBASE(I_MACH)/SBASE                  ! losses coefs in system base
+	blosspu = BLOSS
+	clossrectpu = CLOSSRECT*SBASE/MBASE(I_MACH) 
+	clossinvpu = CLOSSINV*SBASE/MBASE(I_MACH) 
 	
 	! Common variables
 	ALLOCATE(v_udc0(NDCBUS,1)) ! allocate size
@@ -284,7 +305,8 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	thetas = ATAN2(AIMAG(us_phasor_RI),REAL(us_phasor_RI))
 	zc = ZSORCE(I_MACH)*SBASE/MBASE(I_MACH)
 
-	I_STATE_DCGRID = I_STATE_DCGRID_G
+	I_VAR_DCGRID = I_VAR_DCGRID_G            ! stored DCGRID VAR base index
+    I_STATE_DCGRID = I_STATE_DCGRID_G        ! stored DCGRID STATE base index
 
     ! ec = ut + ZSORCE*ict, ISORCE = ec/ZSORCE -> ict = ISORCE - ut/ZSORCE
 	! ISORCE: norton equivalent source current in pu of SBASE
@@ -307,8 +329,6 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	ictd = REAL(ict_phasor_dq)
 	ictq = AIMAG(ict_phasor_dq)
 
-	! IF ((TIME.GT.-1.5)) WRITE (LPDEV,*) 'VSCGFO - CASE ',MODE ,': ',TIME,(ect_phasor_RI/reference_transf), (us_phasor_RI/reference_transf),(ict_phasor_dq),pct
-
 	SELECT CASE (MODE)
 
 		CASE (1) 
@@ -319,14 +339,34 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 			! Get initial value of the DC voltage state from .txt files
 			CALL SUB_READDCBUS(v_udc0, m_VSCACDCBUS, IDGRID, NDCBUS)
 			
-			! Get STATE index position of the dc grid model DCGRID (governor-type model)	  
-			CALL MDLIND(m_VSCACDCBUS(1,2), MACHID(I_MACH), 'GOV', 'STATE', I_STATE_DCGRID, ierr)
-			IF (ierr.NE.0) THEN ! No governor-type model
-				WRITE (LPDEV,*) 'VSCDRO - CASE 1: No governor-type model found at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),'.'
+			! Get VAR index of the DCGRID governor-type model, since DCGRID now updates DC variables through VARs.
+			temp_idx_DCGRID = pack(m_VSCACDCBUS(:,2), m_VSCACDCBUS(:,2) /= -1)
+			idx_DCGRID = temp_idx_DCGRID(1)
+
+			! Get DCGRID base index, supporting both STATE-based and VAR-based implementations.
+			I_STATE_DCGRID = 0
+			I_VAR_DCGRID   = 0
+			
+			CALL MDLIND(idx_DCGRID, MACHID(I_MACH), 'GOV', 'STATE', I_STATE_DCGRID, ierr)
+			IF (ierr.NE.0) THEN
+				I_STATE_DCGRID = 0
+
+				CALL MDLIND(idx_DCGRID, MACHID(I_MACH), 'GOV', 'VAR', I_VAR_DCGRID, ierr)
+				IF (ierr.NE.0) THEN
+					I_VAR_DCGRID = 0
+				END IF
+			END IF    
+			
+			IF ((I_VAR_DCGRID.LE.0).AND.(I_STATE_DCGRID.LE.0)) THEN
+				WRITE (LPDEV,*) 'VSCDRO - CASE 1: No DCGRID VAR or STATE at bus ', NUMBUS(IB), ' with id ', MACHID(I_MACH), '.'
+
+			ELSE IF ((I_VAR_DCGRID_G.LT.0).AND.(I_STATE_DCGRID_G.LT.0)) THEN
+				I_STATE_DCGRID_G = I_STATE_DCGRID   ! Stored DCGRID STATE base index.
+				I_VAR_DCGRID_G   = I_VAR_DCGRID     ! Stored DCGRID VAR base index.      
 			END IF
-			IF (I_STATE_DCGRID_G.LT.0) THEN
-				I_STATE_DCGRID_G = I_STATE_DCGRID
-			END IF
+
+			temp_idx_converter = pack([(i, i = 1, size(m_VSCACDCBUS(:,2)))], m_VSCACDCBUS(:,2) == NUMBUS(IB))
+			idx_converter = temp_idx_converter(1)
 
 			! Get variables of controlled AC bus (c)
 			pctref = pct
@@ -347,12 +387,12 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 			END IF		
 
 			! DC-side voltage, current, power
-			! Note that the VSC is behind a reactance not modelled in VSCGFO but in the power flow. bloss should incude its resistance, rc
-			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, aloss, bloss, c_inv, c_rect)
+			! Note that the VSC is behind a reactance not modelled in VSCGFO but in the power flow. blosspu should incude its resistance, rc
+			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, alosspu, blosspu, clossinvpu, clossrectpu)
 			pdc = -(pct + ploss)
 			ydc = -pdc
-			IF (I_STATE_DCGRID.GT.0) THEN
-				udc = v_udc0(IDXCONVERTER,1) 	! extract initial dc voltage value if any DC grid model
+			IF (I_STATE_DCGRID.GT.0).or.(I_VAR_DCGRID.GT.0) THEN
+				udc = v_udc0(idx_converter,1) 	! extract initial dc voltage value if any DC grid model
 			ELSE
 				udc = 1.0
 			END IF
@@ -406,26 +446,28 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 			deltaec = MIN(MAX(ectref + mqpu*xq + (yqmax1 + yqmax2),ECMIN),ECMAX)
 			CALL SUB_FIRSTORDERWINDUP(xec,xec,d_xec,deltaec,1,-1,DELTAT,TAU,10e9,-10e9)
 			
-			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized. Initial conditions of states K+5 to K+8 might be suspect.'  
-			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': pct = ',pct,', qct = ',qct,', udc = ',udcref
-			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': xec = ',xec,', xdelta = ',xdelta,', xdc = ',xdc
-			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',IDXCONVERTER,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': deltap = ',deltap,', dw = ',dw,', deltaq = ',deltaq,', deltaec = ',deltaec
+			WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),' initialized. Initial conditions of states K+5 to K+8 might be suspect.'  
+			!WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': pct = ',pct,', qct = ',qct,', udc = ',udcref
+			!WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': xec = ',xec,', xdelta = ',xdelta,', xdc = ',xdc
+			!WRITE (LPDEV,*) 'VSCDRO - CASE 1: Converter ',idx_converter,' at bus ',NUMBUS(IB),' with id ',MACHID(I_MACH),': deltap = ',deltap,', dw = ',dw,', deltaq = ',deltaq,', deltaec = ',deltaec
 			EFD(I_MACH) = ectref
             SPEED(I_MACH) = dw
             ANGLE(I_MACH) = xdelta*180/PI
-			PMECH(I_MACH) = pct + ploss
+			PMECH(I_MACH) = -pdc
 											
 		CASE (2) 
 		   
 			! Compute derivatives
 			! ===================	
 			IF (I_STATE_DCGRID.GT.0) THEN
-				udc = STATE(I_STATE_DCGRID + IDXCONVERTER + NDCLINES_PREVIOUS + NDCBUS_PREVIOUS - 1)
+				udc = STATE(I_STATE_DCGRID + idx_converter + NDCLINES_PREVIOUS + NDCBUS_PREVIOUS - 1)
+			ELSE IF (I_VAR_DCGRID.GT.0) THEN
+				udc = VAR(I_VAR_DCGRID + DCGRID_VAR_OFFSET + 2*NDCBUS + idx_converter - 1)
 			ELSE
-				udc = udcref
+			 	udc = udcref
 			END IF
 
-			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, aloss, bloss, c_inv, c_rect)
+			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, alosspu, blosspu, clossinvpu, clossrectpu)
 
             deltap = MIN(MAX(ydc + deltapctref,pcminpu),pcmaxpu) - (pct + ploss)
             dw = mppu*xp + (ypmax1 + ypmax2)
@@ -448,13 +490,16 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 		
 			! Compute output
 			! ==============
+			! Get DC voltage from DCGRID: use STATE if available, otherwise use VAR.
 			IF (I_STATE_DCGRID.GT.0) THEN
-				udc = STATE(I_STATE_DCGRID + IDXCONVERTER + NDCLINES_PREVIOUS + NDCBUS_PREVIOUS - 1)
+				udc = STATE(I_STATE_DCGRID + idx_converter + NDCLINES_PREVIOUS + NDCBUS_PREVIOUS - 1)
+			ELSE IF (I_VAR_DCGRID.GT.0) THEN
+				udc = VAR(I_VAR_DCGRID + DCGRID_VAR_OFFSET + 2*NDCBUS + idx_converter - 1)
 			ELSE
 				udc = udcref
 			END IF
 
-			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, aloss, bloss, c_inv, c_rect)
+			CALL SUB_COMPUTEPLOSS(ploss, pct, ict, alosspu, blosspu, clossinvpu, clossrectpu)
 			pdc = -(pct + ploss)
 			
             deltap = MIN(MAX(ydc + deltapctref,pcminpu),pcmaxpu) - (pct + ploss)
@@ -475,29 +520,17 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
             yqmax1 = MIN(yqmax1,0.0)
             yqmax2 = MAX(yqmax2,0.0)
 			CALL SUB_FIRSTORDERWINDUP(xec,xec,d_xec,deltaec,3,-1,DELTAT,TAU,10e9,-10e9)
-
-			! ect_phasor_dq = CMPLX(xec,0.0)
-
-            ! RI -> dq reference system transformation: xRI = reference_transf*xdq		
-	        ! reference_transf = CMPLX(COS(xdelta),SIN(xdelta))
-			
-			! Hard current limit approximation (should be actually placed in the network solution model due to the voltage dependency)	
-			! ict_phasor_dq = (ect_phasor_dq - us_phasor_RI/reference_transf)/zc
-			! CALL SUB_ICMAXLIMITSECREF(ect_phasor_dq, ict_phasor_dq, (us_phasor_RI/reference_transf), ILIMITPRIORITY, icmaxsspu, zc)		
-			! ect_phasor_RI = ect_phasor_dq*reference_transf
-            ! ISORCE(I_MACH) = ect_phasor_RI/zc       
-
 			
             EFD(I_MACH) = xec
             SPEED(I_MACH) = dw
             ANGLE(I_MACH) = xdelta*180/PI
-			PMECH(I_MACH) = pct + ploss
+			PMECH(I_MACH) = -pdc
 			
 		CASE (4) 
 
 			! Update number of STATEs.
 			! ========================
-			NINTEG = MAX(NINTEG,I_STATE+12)
+			NINTEG = MAX(NINTEG,I_STATE+8)
 
 		CASE (5)
 			! reporting mode
@@ -510,26 +543,26 @@ SUBROUTINE VSCDRO(I_MACH,I_SLOT)
 	! RE-ASSIGN VARIABLES
 	! -------------------	  
 	! VARs	  
-	VAR(I_VAR) = pctref  	
-	VAR(I_VAR+1) = qctref
-	VAR(I_VAR+2) = deltapctref
-	VAR(I_VAR+3) = deltaqctref
-    VAR(I_VAR+4) = ectref	
-	VAR(I_VAR+5) = udcref
+	VAR(I_VAR) = deltapctref			! From SPWDRD
+	VAR(I_VAR+1) = deltaqctref			! From SQWDRD
+	VAR(I_VAR+2) = udcref				! To SPWDRD
+	VAR(I_VAR+3) = udc					! To SPWDRD
+	VAR(I_VAR+4) = pdc					! To DDCGRD/SDCGRD
 
-	VAR(I_VAR+6) = ydc
-	VAR(I_VAR+7) = ypmax1
-	VAR(I_VAR+8) = ypmax2
-	VAR(I_VAR+9) = yqmax1
-	VAR(I_VAR+10) = yqmax2
+	VAR(I_VAR+5) = pctref  	
+	VAR(I_VAR+6) = qctref
+	VAR(I_VAR+7) = ectref	
+	VAR(I_VAR+8) = ydc
+	VAR(I_VAR+9) = ypmax1
+	VAR(I_VAR+10) = ypmax2
+	VAR(I_VAR+11) = yqmax1
+	VAR(I_VAR+12) = yqmax2
 
-	VAR(I_VAR+11) = ictd
-	VAR(I_VAR+12) = ictq
-	VAR(I_VAR+13) = deltap
-	VAR(I_VAR+14) = (pct+ploss)
+	VAR(I_VAR+13) = ictd
+	VAR(I_VAR+14) = ictq
+	VAR(I_VAR+15) = deltap
 
-	VAR(I_VAR+25) = pdc					! To DCGRID
-	VAR(I_VAR+22) = udc					! To SPWDRD
+	VAR(I_VAR+16) = idx_converter 
 		
 	! STATEs
 	STATE(I_STATE) = xec        

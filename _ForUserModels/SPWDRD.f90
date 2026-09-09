@@ -32,7 +32,7 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 	
 	REAL :: Kdc, Kf, K_alpha 
 	REAL :: addps_max, addps_min, ramp_pmax, bp_toclf 
-	REAL :: ps_ini, ps_ref, deltaw_ref, deltaw_bus, deltau_ini, theta_bus, ew, udc_ref, udc
+	REAL :: deltaw_ref, deltaw_bus, deltau_ini, theta_bus, ew, udc_ref, udc
 	REAL :: addps_ref, addps_ref_dc, addps_ref_freq, addps_ref_inertia, addps_ref_supp, d_addps_ref_supp, addps_ref_supp_previous
 	REAL :: w_fil, d_w_fil, xw, d_xw ! STATEs and derivatives
 	
@@ -69,13 +69,11 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 	ADDPs_MAX_NOM = CON(I_CON+8) ! Pmax (p.u-nom)
 	ADDPs_MIN_NOM = CON(I_CON+9) ! Pmin (p.u-nom)
 	RAMP_PMAX_NOM = CON(I_CON+10) ! maximum active power derivative (p.u/s)
-	BP_ERIK_NOM = CON(I_CON+11) ! maximum active power derivative (p.u/s)
+	BP_ERIK_NOM = CON(I_CON+11) ! maximum active power (p.u)
 
 	! VARs  
-	ps_ini = VAR(I_VAR) ! Reference active power, coincides with load flow values.
 	deltaw_ref = VAR(I_VAR+1)
 	deltau_ini = VAR(I_VAR+2)
-	ps_ref = VAR(I_VAR+3)
 	addps_ref = VAR(I_VAR+4)
 	d_addps_ref_supp = VAR(I_VAR+5)
 	udc_ref = VAR(I_VAR+6)
@@ -115,7 +113,7 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 
 
 	! DC-voltage
-	udc = VAR(I_VARCONV+22) ! variable for the converter model
+	udc = VAR(I_VARCONV+3) ! variable for the converter model
 
 	! frequency control and Eriksson's control 
 	delta_f = 0
@@ -139,14 +137,11 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 		! ========================	 
 
 		! Algebraic variables
-		udc_ref = VAR(I_VARCONV+27)		! DC voltage reference
+		udc_ref = VAR(I_VARCONV+2)		! DC voltage reference
 		udc = udc_ref
 		
 		deltaw_ref = 0.0 				! frequency deviation reference
 		
-		ps_ini = VAR(I_VARCONV) 		! initial power SVSCON
-		ps_ref = ps_ini
-
 		addps_ref_dc = 0.0
 		addps_ref_freq = 0.0
 		addps_ref_inertia = 0.0
@@ -166,10 +161,7 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 		w_fil = 0.0
 		xw = w_fil
 		
-		!WRITE (LPDEV,*) 'SPWDRD - MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH)
-		!WRITE (LPDEV,*) 'SPWDRD - CASE 1: Kdc, Kf, K_alpha = ',Kdc, Kf, K_alpha
-		!WRITE (LPDEV,*) 'SPWDRD - CASE 1: delta_f, delta_angle = ',delta_f, delta_angle
-		!WRITE (LPDEV,*) 'SPWDRD - CASE 1: I_VARCONV,ps_initial = ',I_VARCONV,VAR(I_VARCONV)
+		WRITE (LPDEV,*) 'SPWDRD - CASE 1: MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH),' initialized.'
 					
 	CASE (2) 
 	   
@@ -184,7 +176,9 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 			ew = 2*(theta_bus - deltau_ini) - 2*deltaw_ref
 		END IF			
 				
-		
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 2: MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH)
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 2: ew = ',ew, ' w_fil = ',w_fil, ' xw = ',xw
+
 		
 		IF (TF.LT.(2*DELTAT)) THEN
 			d_w_fil = 0.0
@@ -199,7 +193,7 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 		ELSE
 			d_xw  = (-xw + w_fil)/TW
 		END IF
-
+        
 	CASE (3) 
 
 		! Compute output
@@ -256,7 +250,9 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 		
 		omega_est_i = addps_ref*Kf + deltaw_bus
 
-		VAR(I_VARCONV+29) = addps_ref ! put the power reference in the converter
+		VAR(I_VARCONV) = addps_ref ! put the power reference in the converter
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 3: MTDC at AC bus ',NUMBUS(NUMTRM(I_MACH)),' with id ',MACHID(I_MACH)
+		!WRITE (LPDEV,*) 'SPWDRD - CASE 3: addps_ref = ',addps_ref, ' addps_ref_dc = ',addps_ref_dc, ' addps_ref_supp = ',addps_ref_supp
 
 	CASE (4) 
 
@@ -271,10 +267,8 @@ SUBROUTINE SPWDRD(I_MACH,I_SLOT)
 	END SELECT
 
 	! VARs
-	VAR(I_VAR) = ps_ini				! Reference active power, coincides with load flow values
 	VAR(I_VAR+1) = deltaw_ref		! From WDELAY (else 0.0)
 	VAR(I_VAR+2) = deltau_ini
-	VAR(I_VAR+3) = ps_ref
 	VAR(I_VAR+4) = addps_ref 
 	VAR(I_VAR+5) = d_addps_ref_supp
 	VAR(I_VAR+6) = udc_ref

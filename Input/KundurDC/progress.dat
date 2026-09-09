@@ -4,254 +4,514 @@
 
 The Saved Case in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC.sav was saved on WED, SEP 04 2024   8:29
 
-Plant at bus 7 [BUS7        220.00] added. Data items with non-default values:
+Plant at bus 5 [BUS5        220.00] added. Data items with non-default values:
 X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
-         0               7      IREG
+         0               5      IREG
 
-Machine "14" at bus 7 [BUS7        220.00] added. Power flow data items with non-default values:
+Machine "14" at bus 5 [BUS5        220.00] added. Power flow data items with non-default values:
 X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
          1               8      O1
-   0.00000        -400.000      PG
+   0.00000        -200.000      PG
    1.00000        0.100000E-03  ZX
    1.00000         0.00000      GTAP
 
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
+Power flow data changed for machine "14" at bus 5 [BUS5        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
    100.000         500.000      MBASE
 
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   0.00000        0.150000E-01  ZR
+No power flow data changed for machine "14" at bus 5 [BUS5        220.00]
 
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
+Power flow data changed for machine "14" at bus 5 [BUS5        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.200000      ZX
+  0.100000E-03    0.100000      ZX
 
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
+Power flow data changed for machine "14" at bus 5 [BUS5        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
    9999.00         0.00000      QT
   -9999.00         0.00000      QB
 
-Power flow data changed for bus 7 [BUS7        220.00]:
+Power flow data changed for bus 5 [BUS5        220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
          1               2      IDE
 
-Plant at bus 9 [BUS9        220.00] added. Data items with non-default values:
+Plant at bus 11 [BUS11       220.00] added. Data items with non-default values:
 X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
-         0               9      IREG
+         0              11      IREG
 
-Machine "14" at bus 9 [BUS9        220.00] added. Power flow data items with non-default values:
+Machine "14" at bus 11 [BUS11       220.00] added. Power flow data items with non-default values:
 X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
          1               8      O1
-   0.00000         400.000      PG
    1.00000        0.100000E-03  ZX
    1.00000         0.00000      GTAP
 
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
+Power flow data changed for machine "14" at bus 11 [BUS11       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
    100.000         500.000      MBASE
 
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   0.00000        0.150000E-01  ZR
+No power flow data changed for machine "14" at bus 11 [BUS11       220.00]
 
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
+Power flow data changed for machine "14" at bus 11 [BUS11       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.200000      ZX
+  0.100000E-03    0.100000      ZX
 
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
+Power flow data changed for machine "14" at bus 11 [BUS11       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
    9999.00         0.00000      QT
   -9999.00         0.00000      QB
 
-Power flow data changed for bus 9 [BUS9        220.00]:
+Power flow data changed for bus 11 [BUS11       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+         1               2      IDE
+
+Plant at bus 6 [BUS6        220.00] added. Data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         0               6      IREG
+
+Machine "14" at bus 6 [BUS6        220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         1               8      O1
+   0.00000         200.000      PG
+   1.00000        0.100000E-03  ZX
+   1.00000         0.00000      GTAP
+
+Power flow data changed for machine "14" at bus 6 [BUS6        220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   100.000         500.000      MBASE
+
+No power flow data changed for machine "14" at bus 6 [BUS6        220.00]
+
+Power flow data changed for machine "14" at bus 6 [BUS6        220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 6 [BUS6        220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         0.00000      QT
+  -9999.00         0.00000      QB
+
+Power flow data changed for bus 6 [BUS6        220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+         1               2      IDE
+
+Plant at bus 10 [BUS10       220.00] added. Data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         0              10      IREG
+
+Machine "14" at bus 10 [BUS10       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         1               8      O1
+   0.00000        -200.000      PG
+   1.00000        0.100000E-03  ZX
+   1.00000         0.00000      GTAP
+
+Power flow data changed for machine "14" at bus 10 [BUS10       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   100.000         500.000      MBASE
+
+No power flow data changed for machine "14" at bus 10 [BUS10       220.00]
+
+Power flow data changed for machine "14" at bus 10 [BUS10       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 10 [BUS10       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         0.00000      QT
+  -9999.00         0.00000      QB
+
+Power flow data changed for bus 10 [BUS10       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
          1               2      IDE
 
  ITER       DELTAP      BUS         DELTAQ      BUS        DELTA/V/      BUS       DELTAANG      BUS
-  0         4.0000(      7     )    0.0000(      6     )
-                                                            0.11682(      9     )   0.34337(      9     )
-  1         1.5280(      9     )    0.7231(     10     )
-                                                            0.03077(      9     )   0.06099(      9     )
-  2         0.1126(      9     )    0.0510(     10     )
-                                                            0.00252(      9     )   0.00418(      9     )
+  0         2.0000(      6     )    0.0000(      5     )
+                                                            0.02822(      9     )   0.12401(      9     )
+  1         0.1097(     10     )    0.1260(     11     )
+                                                            0.00690(      9     )   0.01484(      9     )
+  2         0.0026(      9     )    0.0017(     11     )
+                                                            0.00017(      9     )   0.00036(      9     )
+  3         0.0000(      9     )    0.0000(     10     )
+
+
+Reached tolerance in 3 iterations
+
+Largest mismatch:     -0.00 MW     -0.00 Mvar      0.00 MVA at bus 10 [BUS10       220.00]
+System total absolute mismatch:                    0.00 MVA
+
+SWING BUS SUMMARY:
+  BUS#-SCT X-- NAME --X BASKV      PGEN     PMAX    PMIN      QGEN     QMAX    QMIN
+     1     BUS1        20.000     276.5   9999.0 -9999.0      49.0   9999.0 -9999.0
+     3     BUS3        20.000    1358.6   9999.0 -9999.0     615.9   9999.0 -9999.0
+
+Bus 12 [BUS12       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+   0.00000         220.000      BASKV
+   1.00000         1.01992      VM
+   0.00000        -4.69321      VA
+"            "  "BUS12       "  NAME
+
+Fixed shunt "14" at bus 12 [BUS12       220.00] added with default data
+
+Two-winding transformer ckt "14" from 5 [BUS5        220.00] to 12 [BUS12       220.00] added. Power flow data items with non-default values:
+X----------------DEFAULT-----------------X  X-----------------ACTUAL-----------------X  DATA ITEM
+                 0.00000                                    0.200000E-02                R1-2
+                0.100000E-03                                0.200000E-01                X1-2
+
+Bus 13 [BUS13       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+   0.00000         220.000      BASKV
+   1.00000        0.961250      VM
+   0.00000        -10.7442      VA
+"            "  "BUS13       "  NAME
+
+Fixed shunt "14" at bus 13 [BUS13       220.00] added with default data
+
+Two-winding transformer ckt "14" from 11 [BUS11       220.00] to 13 [BUS13       220.00] added. Power flow data items with non-default values:
+X----------------DEFAULT-----------------X  X-----------------ACTUAL-----------------X  DATA ITEM
+                 0.00000                                    0.200000E-02                R1-2
+                0.100000E-03                                0.200000E-01                X1-2
+
+Bus 14 [BUS14       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+   0.00000         220.000      BASKV
+   1.00000         1.00868      VM
+   0.00000        -5.74689      VA
+"            "  "BUS14       "  NAME
+
+Fixed shunt "14" at bus 14 [BUS14       220.00] added with default data
+
+Two-winding transformer ckt "14" from 6 [BUS6        220.00] to 14 [BUS14       220.00] added. Power flow data items with non-default values:
+X----------------DEFAULT-----------------X  X-----------------ACTUAL-----------------X  DATA ITEM
+                 0.00000                                    0.200000E-02                R1-2
+                0.100000E-03                                0.200000E-01                X1-2
+
+Bus 15 [BUS15       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+   0.00000         220.000      BASKV
+   1.00000        0.924042      VM
+   0.00000        -32.8102      VA
+"            "  "BUS15       "  NAME
+
+Fixed shunt "14" at bus 15 [BUS15       220.00] added with default data
+
+Two-winding transformer ckt "14" from 10 [BUS10       220.00] to 15 [BUS15       220.00] added. Power flow data items with non-default values:
+X----------------DEFAULT-----------------X  X-----------------ACTUAL-----------------X  DATA ITEM
+                 0.00000                                    0.200000E-02                R1-2
+                0.100000E-03                                0.200000E-01                X1-2
+
+The plant at bus 5 [BUS5        220.00] is deleted
+
+Plant at bus 12 [BUS12       220.00] added. Data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         0              12      IREG
+   1.00000         1.01992      VS
+
+Machine "14" at bus 12 [BUS12       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         1               8      O1
+   0.00000        -199.236      PG
+   0.00000         7.64312      QG
+   1.00000        0.100000E-03  ZX
+   1.00000         0.00000      GTAP
+
+Power flow data changed for machine "14" at bus 12 [BUS12       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   100.000         500.000      MBASE
+
+Power flow data changed for machine "14" at bus 12 [BUS12       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   0.00000        0.500000E-02  ZR
+
+Power flow data changed for machine "14" at bus 12 [BUS12       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 12 [BUS12       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         7.64312      QT
+  -9999.00         7.64312      QB
+
+Power flow data changed for bus 12 [BUS12       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+         1               2      IDE
+
+The plant at bus 11 [BUS11       220.00] is deleted
+
+Plant at bus 13 [BUS13       220.00] added. Data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         0              13      IREG
+   1.00000        0.961250      VS
+
+Machine "14" at bus 13 [BUS13       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         1               8      O1
+   0.00000         200.875      PG
+   0.00000         8.75049      QG
+   1.00000        0.100000E-03  ZX
+   1.00000         0.00000      GTAP
+
+Power flow data changed for machine "14" at bus 13 [BUS13       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   100.000         500.000      MBASE
+
+Power flow data changed for machine "14" at bus 13 [BUS13       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   0.00000        0.500000E-02  ZR
+
+Power flow data changed for machine "14" at bus 13 [BUS13       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 13 [BUS13       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         8.75049      QT
+  -9999.00         8.75049      QB
+
+Power flow data changed for bus 13 [BUS13       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+         1               2      IDE
+
+The plant at bus 6 [BUS6        220.00] is deleted
+
+Plant at bus 14 [BUS14       220.00] added. Data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         0              14      IREG
+   1.00000         1.00868      VS
+
+Machine "14" at bus 14 [BUS14       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         1               8      O1
+   0.00000        -199.219      PG
+   0.00000         7.81359      QG
+   1.00000        0.100000E-03  ZX
+   1.00000         0.00000      GTAP
+
+Power flow data changed for machine "14" at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   100.000         500.000      MBASE
+
+Power flow data changed for machine "14" at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   0.00000        0.500000E-02  ZR
+
+Power flow data changed for machine "14" at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         7.81359      QT
+  -9999.00         7.81359      QB
+
+Power flow data changed for bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+         1               2      IDE
+
+The plant at bus 10 [BUS10       220.00] is deleted
+
+Plant at bus 15 [BUS15       220.00] added. Data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         0              15      IREG
+   1.00000        0.924042      VS
+
+Machine "14" at bus 15 [BUS15       220.00] added. Power flow data items with non-default values:
+X--DEFAULT---X  X---ACTUAL---X  DATA ITEM
+         1               8      O1
+   0.00000         200.948      PG
+   0.00000         9.47936      QG
+   1.00000        0.100000E-03  ZX
+   1.00000         0.00000      GTAP
+
+Power flow data changed for machine "14" at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   100.000         500.000      MBASE
+
+Power flow data changed for machine "14" at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   0.00000        0.500000E-02  ZR
+
+Power flow data changed for machine "14" at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         9.47936      QT
+  -9999.00         9.47936      QB
+
+Power flow data changed for bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+         1               2      IDE
+
+Ordering network...
+Diagonals = 12   Off-diagonals = 10   Maximum size = 20
+
+ ITER       DELTAP      BUS         DELTAQ      BUS        DELTA/V/      BUS       DELTAANG      BUS
+  0         4.0000(     10     )    0.0000(      5     )
+                                                            0.09834(      9     )   0.36504(      9     )
+  1         0.8236(     10     )    1.1071(     11     )
+                                                            0.02892(      9     )   0.07003(      9     )
+  2         0.0625(      9     )    0.0591(     11     )
+                                                            0.00275(      9     )   0.00552(      9     )
   3         0.0007(      9     )    0.0003(     10     )
 
 
 Reached tolerance in 3 iterations
 
-Largest mismatch:      0.07 MW      0.01 Mvar      0.07 MVA at bus 9 [BUS9        220.00]
+Largest mismatch:      0.07 MW      0.00 Mvar      0.07 MVA at bus 9 [BUS9        220.00]
 System total absolute mismatch:                    0.15 MVA
 
 SWING BUS SUMMARY:
   BUS#-SCT X-- NAME --X BASKV      PGEN     PMAX    PMIN      QGEN     QMAX    QMIN
-     1     BUS1        20.000     699.5   9999.0 -9999.0     179.5   9999.0 -9999.0
-     3     BUS3        20.000     698.0   9999.0 -9999.0     123.2   9999.0 -9999.0
+     1     BUS1        20.000     682.2   9999.0 -9999.0     114.7   9999.0 -9999.0
+     3     BUS3        20.000     723.4   9999.0 -9999.0     228.9   9999.0 -9999.0
 
-Data changed for plant at bus 7 [BUS7        220.00]:
+Data changed for plant at bus 12 [BUS12       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   1.00000        0.964633      VS
+   1.01992         1.01429      VS
 
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
+Power flow data changed for machine "14" at bus 12 [BUS12       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  -400.000        -413.524      PG
-   0.00000         9999.00      QT
-   0.00000        -9999.00      QB
-  0.200000        0.100000E-03  ZX
+  -199.236        -202.354      PG
+   7.64311         9999.00      QT
+   7.64311        -9999.00      QB
+  0.100000        0.100000E-03  ZX
 
-No power flow data changed for machine "14" at bus 7 [BUS7        220.00]
+No power flow data changed for machine "14" at bus 12 [BUS12       220.00]
 
-No power flow data changed for machine "14" at bus 7 [BUS7        220.00]
+No power flow data changed for machine "14" at bus 12 [BUS12       220.00]
 
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
+Power flow data changed for machine "14" at bus 12 [BUS12       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.200000      ZX
+  0.100000E-03    0.100000      ZX
 
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
+Power flow data changed for machine "14" at bus 12 [BUS12       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   9999.00         0.00000      QT
-  -9999.00         0.00000      QB
+   9999.00         7.64311      QT
+  -9999.00         7.64311      QB
 
-Power flow data changed for bus 7 [BUS7        220.00]:
+Power flow data changed for bus 12 [BUS12       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
         -2               2      IDE
 
-Data changed for plant at bus 9 [BUS9        220.00]:
+Data changed for plant at bus 13 [BUS13       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   1.00000         1.00435      VS
+  0.961250         1.00487      VS
 
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
+Power flow data changed for machine "14" at bus 13 [BUS13       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   0.00000         9999.00      QT
-   0.00000        -9999.00      QB
-  0.200000        0.100000E-03  ZX
+   8.75049         9999.00      QT
+   8.75049        -9999.00      QB
+  0.100000        0.100000E-03  ZX
 
-No power flow data changed for machine "14" at bus 9 [BUS9        220.00]
+No power flow data changed for machine "14" at bus 13 [BUS13       220.00]
 
-No power flow data changed for machine "14" at bus 9 [BUS9        220.00]
+No power flow data changed for machine "14" at bus 13 [BUS13       220.00]
 
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
+Power flow data changed for machine "14" at bus 13 [BUS13       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.200000      ZX
+  0.100000E-03    0.100000      ZX
 
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
+Power flow data changed for machine "14" at bus 13 [BUS13       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   9999.00         0.00000      QT
-  -9999.00         0.00000      QB
+   9999.00         8.75049      QT
+  -9999.00         8.75049      QB
 
-Power flow data changed for bus 9 [BUS9        220.00]:
+Power flow data changed for bus 13 [BUS13       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+        -2               2      IDE
+
+Data changed for plant at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   1.00868        0.999000      VS
+
+Power flow data changed for machine "14" at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  -199.219        -202.686      PG
+   7.81359         9999.00      QT
+   7.81359        -9999.00      QB
+  0.100000        0.100000E-03  ZX
+
+No power flow data changed for machine "14" at bus 14 [BUS14       220.00]
+
+No power flow data changed for machine "14" at bus 14 [BUS14       220.00]
+
+Power flow data changed for machine "14" at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         7.81359      QT
+  -9999.00         7.81359      QB
+
+Power flow data changed for bus 14 [BUS14       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+        -2               2      IDE
+
+Data changed for plant at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.924042        0.973648      VS
+
+Power flow data changed for machine "14" at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9.47936         9999.00      QT
+   9.47936        -9999.00      QB
+  0.100000        0.100000E-03  ZX
+
+No power flow data changed for machine "14" at bus 15 [BUS15       220.00]
+
+No power flow data changed for machine "14" at bus 15 [BUS15       220.00]
+
+Power flow data changed for machine "14" at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+  0.100000E-03    0.100000      ZX
+
+Power flow data changed for machine "14" at bus 15 [BUS15       220.00]:
+X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
+   9999.00         9.47936      QT
+  -9999.00         9.47936      QB
+
+Power flow data changed for bus 15 [BUS15       220.00]:
 X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
         -2               2      IDE
 
  ITER       DELTAP      BUS         DELTAQ      BUS        DELTA/V/      BUS       DELTAANG      BUS
-  0         0.1352(      7     )    0.0003(     10     )
-                                                            0.00189(      7     )   0.00839(      7     )
-  1         0.0006(      7     )    0.0005(      5     )
-                                                            0.00002(      7     )   0.00003(      7     )
-  2         0.0000(      7     )    0.0000(      7     )
+  0         0.0347(     14     )    0.0003(     10     )
+                                                            0.00029(     14     )   0.00273(     14     )
+  1         0.0000(     14     )    0.0001(      5     )
+                                                            0.00000(     12     )   0.00000(     14     )
+  2         0.0000(      5     )    0.0000(      5     )
 
 
 Reached tolerance in 2 iterations
 
-Largest mismatch:      0.00 MW      0.00 Mvar      0.00 MVA at bus 7 [BUS7        220.00]
+Largest mismatch:      0.00 MW     -0.00 Mvar      0.00 MVA at bus 4 [BUS4        20.000]
 System total absolute mismatch:                    0.00 MVA
 
 SWING BUS SUMMARY:
   BUS#-SCT X-- NAME --X BASKV      PGEN     PMAX    PMIN      QGEN     QMAX    QMIN
-     1     BUS1        20.000     714.0   9999.0 -9999.0     186.4   9999.0 -9999.0
-     3     BUS3        20.000     698.0   9999.0 -9999.0     123.2   9999.0 -9999.0
-
-Data changed for plant at bus 7 [BUS7        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.964633        0.962793      VS
-
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  -413.524        -413.546      PG
-   0.00000         9999.00      QT
-   0.00000        -9999.00      QB
-  0.200000        0.100000E-03  ZX
-
-No power flow data changed for machine "14" at bus 7 [BUS7        220.00]
-
-No power flow data changed for machine "14" at bus 7 [BUS7        220.00]
-
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.200000      ZX
-
-Power flow data changed for machine "14" at bus 7 [BUS7        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   9999.00         0.00000      QT
-  -9999.00         0.00000      QB
-
-Power flow data changed for bus 7 [BUS7        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-        -2               2      IDE
-
-Data changed for plant at bus 9 [BUS9        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   1.00435         1.00433      VS
-
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   0.00000         9999.00      QT
-   0.00000        -9999.00      QB
-  0.200000        0.100000E-03  ZX
-
-No power flow data changed for machine "14" at bus 9 [BUS9        220.00]
-
-No power flow data changed for machine "14" at bus 9 [BUS9        220.00]
-
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-  0.100000E-03    0.200000      ZX
-
-Power flow data changed for machine "14" at bus 9 [BUS9        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-   9999.00         0.00000      QT
-  -9999.00         0.00000      QB
-
-Power flow data changed for bus 9 [BUS9        220.00]:
-X--ORIGINAL--X  X-NEW VALUE--X  DATA ITEM
-        -2               2      IDE
+     1     BUS1        20.000     688.9   9999.0 -9999.0     116.5   9999.0 -9999.0
+     3     BUS3        20.000     723.5   9999.0 -9999.0     229.0   9999.0 -9999.0
 
  ITER       DELTAP      BUS         DELTAQ      BUS        DELTA/V/      BUS       DELTAANG      BUS
-  0         0.0002(      7     )    0.0000(      6     )
-                                                            0.00000(      7     )   0.00001(      7     )
-  1         0.0000(      2     )    0.0000(      7     )
-                                                            0.00000(      7     )   0.00000(      7     )
-  2         0.0000(     10     )    0.0000(      9     )
-
-
-Reached tolerance in 2 iterations
-
-Largest mismatch:     -0.00 MW      0.00 Mvar      0.00 MVA at bus 2 [BUS2        20.000]
-System total absolute mismatch:                    0.00 MVA
-
-SWING BUS SUMMARY:
-  BUS#-SCT X-- NAME --X BASKV      PGEN     PMAX    PMIN      QGEN     QMAX    QMIN
-     1     BUS1        20.000     714.0   9999.0 -9999.0     186.4   9999.0 -9999.0
-     3     BUS3        20.000     698.0   9999.0 -9999.0     123.2   9999.0 -9999.0
-
- ITER       DELTAP      BUS         DELTAQ      BUS        DELTA/V/      BUS       DELTAANG      BUS
-  0         0.0000(     10     )    0.0000(      9     )
+  0         0.0000(      5     )    0.0000(      5     )
+                                                            0.00000(     14     )   0.00000(     14     )
+  1         0.0000(     10     )    0.0000(     11     )
                                                             0.00000(      9     )   0.00000(      9     )
-  1         0.0000(      6     )    0.0000(      7     )
-                                                            0.00000(      7     )   0.00000(      2     )
-  2         0.0000(      7     )    0.0000(     10     )
+  2         0.0000(     10     )    0.0000(     11     )
 
 
 Reached tolerance in 2 iterations
 
-Largest mismatch:     -0.00 MW      0.00 Mvar      0.00 MVA at bus 2 [BUS2        20.000]
+Largest mismatch:     -0.00 MW     -0.00 Mvar      0.00 MVA at bus 4 [BUS4        20.000]
 System total absolute mismatch:                    0.00 MVA
 
 SWING BUS SUMMARY:
   BUS#-SCT X-- NAME --X BASKV      PGEN     PMAX    PMIN      QGEN     QMAX    QMIN
-     1     BUS1        20.000     714.0   9999.0 -9999.0     186.4   9999.0 -9999.0
-     3     BUS3        20.000     698.0   9999.0 -9999.0     123.2   9999.0 -9999.0
+     1     BUS1        20.000     688.9   9999.0 -9999.0     116.5   9999.0 -9999.0
+     3     BUS3        20.000     723.5   9999.0 -9999.0     229.0   9999.0 -9999.0
 
 Output completed
 
-Case saved in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC_MTDCg.sav on THU, MAY 08 2025  15:33
+Case saved in file C:\Users\lsigrist\OneDrive - Universidad Pontificia Comillas\PSSE\Tools\HYACDCSIM\Input\KundurDC\kundur32_noAC_MTDCg.sav on FRI, JUN 26 2026  18:10
